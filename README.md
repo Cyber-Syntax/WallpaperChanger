@@ -4,6 +4,15 @@ I set some wallpapers for my work day and my day off.
 If it is midweek, script will change my wallpaper to my work day wallpapers.
 If it is sunday , script will change my wallpaper to my day off wallpapers.
 
+# Requirements
+- `feh` need to be installed
+    - Debian
+        - `sudo apt install feh`
+    - Arch
+        - `sudo pacman -S feh`
+    - Fedora
+        - `sudo dnf install feh`
+
 # How to use
 - Clone the repository
     - `git clone https://github.com/Cyber-Syntax/WallpaperChanger.git`
