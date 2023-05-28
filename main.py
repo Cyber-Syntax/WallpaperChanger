@@ -1,5 +1,5 @@
-"""Script to set the wallpaper according to the day of the week."""
 #!/usr/bin/python3
+"""Script to set the wallpaper according to the day of the week."""
 
 import os
 import datetime
@@ -30,8 +30,7 @@ primary_image_path = get_random_image(PRIMARY_DIR)
 # Set the wallpaper according to the day
 if current_day == 6:
     # set all monitor SUNDAY_DIR but every monitor different wallpaper
-    files_sunday = os.listdir(SUNDAY_DIR)
-    os.system(f"feh --bg-fill --randomize file:///{files_sunday}")
+    subprocess.run(args=["feh", "--bg-fill", f"{SUNDAY_DIR}"],)
 
 else:
     # feh handle the separate monitors like this:
