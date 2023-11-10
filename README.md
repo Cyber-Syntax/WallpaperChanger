@@ -12,6 +12,9 @@ If it is sunday , script will change my wallpaper to my day off wallpapers.
         - `sudo pacman -S feh`
     - Fedora
         - `sudo dnf install feh`
+- Directories need to be created and pictures need to be stored in them
+    - `mkdir ~/Pictures/Wallpapers/Programmers/left_output/`
+    - `mkdir ~/Pictures/Wallpapers/Programmers/primary_output/`
 
 # How to use
 - Clone the repository
