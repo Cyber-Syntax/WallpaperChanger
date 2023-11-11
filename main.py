@@ -63,6 +63,7 @@ def main():
             "feh",
             "--bg-fill",
             f"{left_image_path}",
+            "--bg-fill",
             f"{primary_image_path}",
         ], check=True)
 
