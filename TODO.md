@@ -9,8 +9,11 @@ Project Description
 
 ### In Progress
 
-- [ ] Add gnome support  
+- [ ] Add gnome support
+- [ ] Add different images for different monitors (wayland) 
 
 ### Done ✓
+
+- [x] Add wayland support
 
 
