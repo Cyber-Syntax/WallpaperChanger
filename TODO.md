@@ -6,14 +6,14 @@ Project Description
 
 ### Todo
 
+- [ ] Add gnome support  
 
 ### In Progress
 
-- [ ] Add gnome support
-- [ ] Add different images for different monitors (wayland) 
+- [ ] Test X11  
+- [ ] Add different images for different monitors (wayland, sunday)  
 
 ### Done ✓
 
-- [x] Add wayland support
-
+- [x] Add wayland support  
 
