@@ -142,7 +142,6 @@ dmypy.json
 *sha512*
 *SHA*
 # test
-*test*
 *None*
 
 .pylintrc
