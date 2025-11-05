@@ -142,7 +142,6 @@ dmypy.json
 *sha512*
 *SHA*
 # test
-*test*
 *None*
 
 .pylintrc
@@ -152,3 +151,4 @@ dmypy.json
 
 # logs
 *.log*
+plan

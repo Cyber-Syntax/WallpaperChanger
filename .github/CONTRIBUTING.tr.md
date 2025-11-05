@@ -1,0 +1,18 @@
+# **🤝 Katkı Sağlamayı Düşündüğünüz İçin Teşekkürler!**
+
+Python öğrenmek için bir script yazmaya başlamıştım, ancak bu script psikolojik etkisi sayesinde motivasyonumu artırdı. Bu nedenle, projemi halka açmaya karar verdim. Bu, kişisel bir proje olup, basit ve öğrenmeye odaklı tutulmak istenmektedir. Katkıda bulunma ilginiz için teşekkür ederim; ancak bu projenin büyük ölçekli işbirliği amaçlamadığını lütfen unutmayın.
+
+## Yardımcı Olabilecek Şeyler
+
+### **Nasıl Katkı Sağlayabilirsiniz:**
+
+- **İyileştirme önerileri:** Script'i nasıl geliştirebileceğinizle ilgili fikirleriniz varsa, bir issue açarak ya da pull request göndererek katkı sağlayabilirsiniz.
+- **Hata bildirimleri:** Herhangi bir sorun veya hata ile karşılaşırsanız, lütfen problemi detaylarıyla birlikte bir issue açarak bildirin.
+- **Dokümantasyon:** Dokümantasyonu geliştirmeye yönelik katkılar her zaman kabul edilir.
+
+### **Ne Bekleyebilirsiniz:**
+
+- Katkıları ve önerileri, zamanım olduğunda inceleyeceğim, ancak bu projenin **kalıcı beta aşamasında** olduğunu ve zamanımın sınırlı olabileceğini unutmayın.
+- Bu proje kişisel bir öğrenme projesi olduğundan, her katkının birleştirileceğini veya geniş bir geri bildirim sağlanabileceğini garanti edemem.
+
+Katkı sağlamak isterseniz, lütfen bir pull request açmaktan veya bir tartışma başlatmaktan çekinmeyin. İlginiz için teşekkür ederim!

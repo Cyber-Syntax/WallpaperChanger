@@ -37,7 +37,3 @@ If it is sunday , script will change my wallpaper to my day off wallpapers.
     - Firstly, you need to change the path of the folder where your wallpapers are stored.
         - For example, my left output wallpaper stored in `~/Pictures/Wallpapers/Programmers/left_output/`
         - my primary output wallpaper stored in `~/Pictures/Wallpapers/Programmers/primary_output/`
-
-# LICENSE
-This project is licensed under
-[GNU GENERAL PUBLIC LICENSE](https://github.com/Cyber-Syntax/WallpaperChanger/blob/master/LICENSE)
