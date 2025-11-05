@@ -1,12 +1,18 @@
-#!/usr/bin/python3
-"""Automatically sets wallpapers based on the day of the week and monitor setup.
+#!/usr/bin/env python3
+"""Automatically sets wallpapers based on configuration.
 
-This script selects wallpapers from designated directories depending on whether it's Sunday,
-the number of connected monitors, and the current display server (X11 or Wayland/Sway).
+This script selects wallpapers from designated directories depending on:
+- Day of the week (workday vs configured holidays)
+- Time of day (light/dark themes)
+- Number of connected monitors
+- Current display server (X11 or Wayland/Sway)
+
 Wallpapers are set using appropriate tools (feh for X11, swaybg for Sway on Wayland).
 
 Features:
-- Daily rotation with special wallpapers on Sundays
+- Configurable holidays (not just Sunday)
+- Time-based wallpaper selection (day/night)
+- Work vs Holiday wallpaper distinction
 - Multi-monitor support with alternating wallpaper directories
 - Logging with rotation for troubleshooting
 - Display server detection (X11/Wayland)
@@ -23,47 +29,51 @@ import logging
 import os
 import random
 import subprocess
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# Configuration Constants - Update these paths as needed
-WALLPAPER_DIRS: dict[str, str] = {
-    "left": "/home/developer/Pictures/Wallpapers/Programmers/left_output/",
-    "primary": "/home/developer/Pictures/Wallpapers/Programmers/primary_output/",
-    "sunday": "/home/developer/Pictures/Wallpapers/Programmers/Sunday/",
-}
-
-# Logging Configuration - XDG Base Directory compliant
-LOG_DIR: Path = Path.home() / ".local" / "share" / "wallpaperchanger" / "logs"
-LOG_FILE: Path = LOG_DIR / "main.log"
-LOG_MAX_SIZE: int = 1 * 1024 * 1024  # 1MB
-LOG_BACKUP_COUNT: int = 3
+from src.config_loader import Config, create_default_config, load_config
 
 
-def configure_logging() -> None:
-    """Sets up rotating logs with timestamps and severity levels."""
+def configure_logging(config: Config) -> None:
+    """Sets up rotating logs with timestamps and severity levels.
+
+    Args:
+        config: Application configuration with logging settings
+
+    """
+    log_dir = config.logging.log_dir
+    log_file = log_dir / "main.log"
+
     # Ensure log directory exists
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(config.logging.log_level)
+
+    # Clear any existing handlers
+    logger.handlers.clear()
 
     handler = RotatingFileHandler(
-        str(LOG_FILE),
-        maxBytes=LOG_MAX_SIZE,
-        backupCount=LOG_BACKUP_COUNT,
+        str(log_file),
+        maxBytes=config.logging.max_size_mb * 1024 * 1024,
+        backupCount=config.logging.backup_count,
     )
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
 
-def get_random_image(directory: str, used_images: list[str]) -> str | None:
+def get_random_image(
+    directory: Path, used_images: list[str], extensions: list[str]
+) -> Path | None:
     """Selects a random image from a directory, avoiding recently used images.
 
     Args:
         directory: Path to search for images
         used_images: Images to exclude from selection
+        extensions: List of valid image extensions
 
     Returns:
         Full path to selected image or None if error
@@ -71,17 +81,17 @@ def get_random_image(directory: str, used_images: list[str]) -> str | None:
     """
     try:
         # Verify directory exists
-        if not os.path.isdir(directory):
+        if not directory.is_dir():
             logging.error("Missing wallpaper directory: %s", directory)
             return None
 
         # Get eligible images (case-insensitive check for image extensions)
         images = [
-            f
-            for f in os.listdir(directory)
-            if f.lower().endswith((".png", ".jpg", ".jpeg"))
-            and f not in used_images
-            and os.path.isfile(os.path.join(directory, f))
+            f.name
+            for f in directory.iterdir()
+            if f.is_file()
+            and f.suffix.lower() in extensions
+            and f.name not in used_images
         ]
 
         if not images:
@@ -91,7 +101,7 @@ def get_random_image(directory: str, used_images: list[str]) -> str | None:
         selection = random.choice(images)
         used_images.append(selection)
         logging.info("Selected %s from %s", selection, directory)
-        return os.path.join(directory, selection)
+        return directory / selection
 
     except Exception as e:
         logging.error("Image selection failed: %s", e)
@@ -130,7 +140,8 @@ def get_x11_monitors() -> list[str]:
             if "Monitors:" not in line
         ]
     except subprocess.CalledProcessError as e:
-        logging.error("xrandr failed: %s", e.stderr)
+        stderr_msg = e.stderr if e.stderr else "Unknown error"
+        logging.error("xrandr failed: %s", stderr_msg)
         return []
 
 
@@ -148,14 +159,18 @@ def get_sway_monitors() -> list[str]:
             text=True,
             check=True,
         )
-        outputs = json.loads(result.stdout)
-        return [o["name"] for o in outputs if o["active"]]
+        outputs: list[dict[str, object]] = json.loads(result.stdout)
+        return [
+            str(o["name"])
+            for o in outputs
+            if isinstance(o.get("active"), bool) and o["active"]
+        ]
     except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
         logging.error("swaymsg failed: %s", e)
         return []
 
 
-def set_x11_wallpaper(image_paths: list[str]) -> None:
+def set_x11_wallpaper(image_paths: list[Path]) -> None:
     """Sets wallpapers for all monitors using feh.
 
     Args:
@@ -163,13 +178,15 @@ def set_x11_wallpaper(image_paths: list[str]) -> None:
 
     """
     try:
-        subprocess.run(["feh", "--bg-fill"] + image_paths, check=True)
+        _ = subprocess.run(
+            ["feh", "--bg-fill"] + [str(p) for p in image_paths], check=True
+        )
         logging.info("Set X11 wallpapers: %s", image_paths)
     except subprocess.CalledProcessError as e:
         logging.error("feh failed: %s", e)
 
 
-def set_sway_wallpaper(image_paths: list[str], monitors: list[str]) -> None:
+def set_sway_wallpaper(image_paths: list[Path], monitors: list[str]) -> None:
     """Sets wallpapers for all monitors using swaybg.
 
     Args:
@@ -179,12 +196,12 @@ def set_sway_wallpaper(image_paths: list[str], monitors: list[str]) -> None:
     """
     try:
         # Clean up existing swaybg processes
-        subprocess.run(["pkill", "swaybg"], check=False)
+        _ = subprocess.run(["pkill", "swaybg"], check=False)
 
         # Launch new instances for each monitor
         for monitor, image in zip(monitors, image_paths, strict=False):
-            subprocess.Popen(
-                ["swaybg", "-o", monitor, "-i", image, "-m", "fill"]
+            _ = subprocess.Popen(
+                ["swaybg", "-o", monitor, "-i", str(image), "-m", "fill"]
             )
         mapping = dict(zip(monitors, image_paths, strict=False))
         logging.info("Set Sway wallpapers: %s", mapping)
@@ -192,17 +209,131 @@ def set_sway_wallpaper(image_paths: list[str], monitors: list[str]) -> None:
         logging.error("swaybg failed: %s", e)
 
 
+def select_wallpapers(
+    config: Config,
+    monitor_count: int,
+    is_holiday: bool,
+    is_daytime: bool,
+) -> list[Path]:
+    """Select appropriate wallpapers based on configuration and context.
+
+    Args:
+        config: Application configuration
+        monitor_count: Number of monitors detected
+        is_holiday: Whether today is a configured holiday
+        is_daytime: Whether current time is during day hours
+
+    Returns:
+        List of wallpaper paths for each monitor
+
+    """
+    # Get appropriate directories based on context
+    try:
+        wallpaper_dirs = config.get_wallpaper_dirs(is_holiday, is_daytime)
+    except ValueError as e:
+        logging.error("Failed to get wallpaper directories: %s", e)
+        return []
+
+    # Track used images to avoid duplicates on multiple monitors
+    used_images: list[str] = []
+    wallpaper_paths: list[Path] = []
+
+    # Select wallpapers for each monitor
+    for idx in range(monitor_count):
+        # Alternate between primary and left directories if both available
+        if "left" in wallpaper_dirs and idx % 2 == 1:
+            directory = wallpaper_dirs["left"]
+        else:
+            directory = wallpaper_dirs["primary"]
+
+        path = get_random_image(
+            directory, used_images, config.image_extensions
+        )
+        if path:
+            wallpaper_paths.append(path)
+        else:
+            logging.error("Failed to select wallpaper from %s", directory)
+
+    return wallpaper_paths
+
+
 def main() -> None:
     """Main execution flow to set wallpapers based on current configuration."""
-    configure_logging()
+    config_path = Path.home() / ".config" / "wallpaperchanger" / "config.ini"
+
+    # Auto-create default config on first run
+    if not config_path.exists():
+        print(
+            "⚠️  Configuration file not found. Creating default configuration...",
+            file=sys.stderr,
+        )
+        try:
+            create_default_config(config_path)
+            print(
+                f"✅ Created default configuration at: {config_path}",
+                file=sys.stderr,
+            )
+            print(
+                "\n⚠️  IMPORTANT: Please edit the configuration file to set your wallpaper directories!",
+                file=sys.stderr,
+            )
+            print(f"   Edit: {config_path}", file=sys.stderr)
+            print(
+                "\nThe default configuration is set for a specific user setup.",
+                file=sys.stderr,
+            )
+            print(
+                "You MUST update the paths to match your system to avoid errors.\n",
+                file=sys.stderr,
+            )
+            print(
+                "After editing the config, run the script again:",
+                file=sys.stderr,
+            )
+            print("  python -m src.wallpaper", file=sys.stderr)
+            sys.exit(0)
+        except Exception as e:
+            print(f"❌ Failed to create default config: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    try:
+        # Load configuration
+        config = load_config(config_path)
+    except ValueError as e:
+        error_msg = f"Configuration error: {e}"
+        print(error_msg, file=sys.stderr)
+        print(
+            f"\nPlease check your configuration file: {config_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except Exception as e:
+        error_msg = f"Unexpected error loading configuration: {e}"
+        print(error_msg, file=sys.stderr)
+        sys.exit(1)
+
+    # Set up logging
+    configure_logging(config)
     logging.info("=== Starting wallpaper rotation ===")
 
     # Determine current context
-    today = datetime.datetime.today()
-    is_sunday = today.weekday() == 6  # Monday=0,...,Sunday=6
+    now = datetime.datetime.now()
+    weekday = now.weekday()
+    current_time = now.time()
+
+    is_holiday = config.is_holiday(weekday)
+    is_daytime = config.is_daytime(current_time)
+
+    logging.info(
+        "Context: %s, %s, Time: %s",
+        "Holiday" if is_holiday else "Workday",
+        "Day" if is_daytime else "Night",
+        current_time.strftime("%H:%M"),
+    )
+
+    # Detect display server and monitors
     display_server = detect_display_server()
 
-    # Detect monitors
     if display_server == "wayland":
         monitors = get_sway_monitors()
     else:
@@ -211,32 +342,14 @@ def main() -> None:
     monitor_count = len(monitors)
     logging.info("Active monitors (%d): %s", monitor_count, monitors)
 
-    # Select appropriate wallpaper directory strategy
-    used_images: list[str] = []
-    wallpaper_paths: list[str] = []
+    if monitor_count == 0:
+        logging.error("No monitors detected!")
+        return
 
-    if is_sunday:
-        # Sunday special case - same directory for all monitors
-        for _ in range(monitor_count):
-            path = get_random_image(WALLPAPER_DIRS["sunday"], used_images)
-            if path:
-                wallpaper_paths.append(path)
-    elif monitor_count == 1:
-        # Single monitor - use primary directory
-        path = get_random_image(WALLPAPER_DIRS["primary"], used_images)
-        if path:
-            wallpaper_paths.append(path)
-    else:
-        # Multi-monitor - alternate between primary and left directories
-        for idx in range(monitor_count):
-            directory = (
-                WALLPAPER_DIRS["primary"]
-                if idx % 2 == 0
-                else WALLPAPER_DIRS["left"]
-            )
-            path = get_random_image(directory, used_images)
-            if path:
-                wallpaper_paths.append(path)
+    # Select appropriate wallpapers
+    wallpaper_paths = select_wallpapers(
+        config, monitor_count, is_holiday, is_daytime
+    )
 
     # Validate selections
     if len(wallpaper_paths) != monitor_count:
