@@ -1,7 +1,5 @@
 #!/usr/bin/python3
-# -*- coding: utf-8 -*-
-"""
-Automatically sets wallpapers based on the day of the week and monitor setup.
+"""Automatically sets wallpapers based on the day of the week and monitor setup.
 
 This script selects wallpapers from designated directories depending on whether it's Sunday,
 the number of connected monitors, and the current display server (X11 or Wayland/Sway).
@@ -16,6 +14,7 @@ Features:
 Example:
     >>> from wallpaper_changer import wallpaper
     >>> wallpaper.main()
+
 """
 
 import datetime
@@ -60,8 +59,7 @@ def configure_logging() -> None:
 
 
 def get_random_image(directory: str, used_images: list[str]) -> str | None:
-    """
-    Selects a random image from a directory, avoiding recently used images.
+    """Selects a random image from a directory, avoiding recently used images.
 
     Args:
         directory: Path to search for images
@@ -69,6 +67,7 @@ def get_random_image(directory: str, used_images: list[str]) -> str | None:
 
     Returns:
         Full path to selected image or None if error
+
     """
     try:
         # Verify directory exists
@@ -100,11 +99,11 @@ def get_random_image(directory: str, used_images: list[str]) -> str | None:
 
 
 def detect_display_server() -> str:
-    """
-    Identifies the current display server environment.
+    """Identifies the current display server environment.
 
     Returns:
         Current display server: 'x11', 'wayland', or 'unknown'
+
     """
     server = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
     logging.info("Detected display server: %s", server)
@@ -112,11 +111,11 @@ def detect_display_server() -> str:
 
 
 def get_x11_monitors() -> list[str]:
-    """
-    Returns connected monitor names using xrandr (X11 only).
+    """Returns connected monitor names using xrandr (X11 only).
 
     Returns:
         List of connected monitor names
+
     """
     try:
         result = subprocess.run(
@@ -136,11 +135,11 @@ def get_x11_monitors() -> list[str]:
 
 
 def get_sway_monitors() -> list[str]:
-    """
-    Returns active monitor names using swaymsg (Sway/Wayland only).
+    """Returns active monitor names using swaymsg (Sway/Wayland only).
 
     Returns:
         List of active monitor names
+
     """
     try:
         result = subprocess.run(
@@ -157,11 +156,11 @@ def get_sway_monitors() -> list[str]:
 
 
 def set_x11_wallpaper(image_paths: list[str]) -> None:
-    """
-    Sets wallpapers for all monitors using feh.
+    """Sets wallpapers for all monitors using feh.
 
     Args:
         image_paths: Ordered list of wallpaper paths per monitor
+
     """
     try:
         subprocess.run(["feh", "--bg-fill"] + image_paths, check=True)
@@ -171,23 +170,23 @@ def set_x11_wallpaper(image_paths: list[str]) -> None:
 
 
 def set_sway_wallpaper(image_paths: list[str], monitors: list[str]) -> None:
-    """
-    Sets wallpapers for all monitors using swaybg.
+    """Sets wallpapers for all monitors using swaybg.
 
     Args:
         image_paths: Ordered list of wallpaper paths per monitor
         monitors: Monitor names from swaymsg
+
     """
     try:
         # Clean up existing swaybg processes
         subprocess.run(["pkill", "swaybg"], check=False)
 
         # Launch new instances for each monitor
-        for monitor, image in zip(monitors, image_paths):
+        for monitor, image in zip(monitors, image_paths, strict=False):
             subprocess.Popen(
                 ["swaybg", "-o", monitor, "-i", image, "-m", "fill"]
             )
-        mapping = dict(zip(monitors, image_paths))
+        mapping = dict(zip(monitors, image_paths, strict=False))
         logging.info("Set Sway wallpapers: %s", mapping)
     except Exception as e:
         logging.error("swaybg failed: %s", e)
