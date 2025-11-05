@@ -8,9 +8,8 @@ This module tests the logging setup functionality of the wallpaper changer modul
 
 import logging
 import os
-import pytest
-from unittest.mock import patch, MagicMock, Mock
-from typing import List, Dict, Any, Generator
+
+
 from src import wallpaper
 
 
@@ -43,7 +42,9 @@ class TestLoggingConfiguration:
             assert isinstance(handler, logging.handlers.RotatingFileHandler)
 
             # Verify handler has correct configuration
-            assert handler.baseFilename == os.path.abspath(wallpaper.LOG_FILE)
+            assert handler.baseFilename == os.path.abspath(
+                str(wallpaper.LOG_FILE)
+            )
             assert handler.maxBytes == wallpaper.LOG_MAX_SIZE
             assert handler.backupCount == wallpaper.LOG_BACKUP_COUNT
 

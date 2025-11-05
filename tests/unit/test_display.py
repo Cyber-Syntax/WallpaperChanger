@@ -8,16 +8,17 @@ and wallpaper setting functionality of the wallpaper changer module.
 """
 
 import subprocess
-import pytest
-from unittest.mock import patch, MagicMock, call
-from typing import List, Dict, Any
+from unittest.mock import MagicMock, call, patch
+
 from src import wallpaper
 
 
 class TestDisplayDetection:
     """Tests for display server and monitor detection functionality."""
 
-    def test_detect_display_server_x11(self, mock_x11_environment: None) -> None:
+    def test_detect_display_server_x11(
+        self, mock_x11_environment: None
+    ) -> None:
         """
         Test detection of X11 display server.
 
@@ -65,14 +66,19 @@ class TestDisplayDetection:
             result = wallpaper.get_x11_monitors()
 
             mock_run.assert_called_once_with(
-                ["xrandr", "--listmonitors"], capture_output=True, text=True, check=True
+                ["xrandr", "--listmonitors"],
+                capture_output=True,
+                text=True,
+                check=True,
             )
 
             assert result == ["DP-1", "HDMI-1"]
 
     def test_get_x11_monitors_failure(self) -> None:
         """Test handling of xrandr command failure."""
-        error = subprocess.CalledProcessError(1, "xrandr", stderr="Command failed")
+        error = subprocess.CalledProcessError(
+            1, "xrandr", stderr="Command failed"
+        )
 
         with patch("subprocess.run", side_effect=error) as mock_run:
             with patch("logging.error") as mock_log:
@@ -82,7 +88,9 @@ class TestDisplayDetection:
                 mock_run.assert_called_once()
                 mock_log.assert_called_once()
 
-    def test_get_sway_monitors_success(self, mock_sway_outputs_json: str) -> None:
+    def test_get_sway_monitors_success(
+        self, mock_sway_outputs_json: str
+    ) -> None:
         """
         Test successful detection of Sway monitors.
 
@@ -106,7 +114,9 @@ class TestDisplayDetection:
 
     def test_get_sway_monitors_subprocess_failure(self) -> None:
         """Test handling of swaymsg command failure."""
-        error = subprocess.CalledProcessError(1, "swaymsg", stderr="Command failed")
+        error = subprocess.CalledProcessError(
+            1, "swaymsg", stderr="Command failed"
+        )
 
         with patch("subprocess.run", side_effect=error) as mock_run:
             with patch("logging.error") as mock_log:
@@ -169,7 +179,9 @@ class TestWallpaperSetting:
                     wallpaper.set_sway_wallpaper(wallpaper_paths, monitors)
 
                     # Check that pkill was called to clean up processes
-                    mock_run.assert_called_once_with(["pkill", "swaybg"], check=False)
+                    mock_run.assert_called_once_with(
+                        ["pkill", "swaybg"], check=False
+                    )
 
                     # Check that swaybg was launched for each monitor
                     assert mock_popen.call_count == 2

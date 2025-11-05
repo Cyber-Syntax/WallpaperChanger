@@ -18,36 +18,39 @@ Example:
     >>> wallpaper.main()
 """
 
-import os
 import datetime
+import json
+import logging
+import os
 import random
 import subprocess
-import logging
-import json
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
 
 # Configuration Constants - Update these paths as needed
-WALLPAPER_DIRS: Dict[str, str] = {
+WALLPAPER_DIRS: dict[str, str] = {
     "left": "/home/developer/Pictures/Wallpapers/Programmers/left_output/",
     "primary": "/home/developer/Pictures/Wallpapers/Programmers/primary_output/",
     "sunday": "/home/developer/Pictures/Wallpapers/Programmers/Sunday/",
 }
 
-# Logging Configuration
-LOG_FILE: str = os.path.join(os.path.dirname(__file__), "wallpaper.log")
+# Logging Configuration - XDG Base Directory compliant
+LOG_DIR: Path = Path.home() / ".local" / "share" / "wallpaperchanger" / "logs"
+LOG_FILE: Path = LOG_DIR / "main.log"
 LOG_MAX_SIZE: int = 1 * 1024 * 1024  # 1MB
 LOG_BACKUP_COUNT: int = 3
 
 
 def configure_logging() -> None:
     """Sets up rotating logs with timestamps and severity levels."""
+    # Ensure log directory exists
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
     handler = RotatingFileHandler(
-        LOG_FILE,
+        str(LOG_FILE),
         maxBytes=LOG_MAX_SIZE,
         backupCount=LOG_BACKUP_COUNT,
     )
@@ -56,7 +59,7 @@ def configure_logging() -> None:
     logger.addHandler(handler)
 
 
-def get_random_image(directory: str, used_images: List[str]) -> Optional[str]:
+def get_random_image(directory: str, used_images: list[str]) -> str | None:
     """
     Selects a random image from a directory, avoiding recently used images.
 
@@ -70,7 +73,7 @@ def get_random_image(directory: str, used_images: List[str]) -> Optional[str]:
     try:
         # Verify directory exists
         if not os.path.isdir(directory):
-            logging.error(f"Missing wallpaper directory: {directory}")
+            logging.error("Missing wallpaper directory: %s", directory)
             return None
 
         # Get eligible images (case-insensitive check for image extensions)
@@ -83,16 +86,16 @@ def get_random_image(directory: str, used_images: List[str]) -> Optional[str]:
         ]
 
         if not images:
-            logging.warning(f"No unused images found in {directory}")
+            logging.warning("No unused images found in %s", directory)
             return None
 
         selection = random.choice(images)
         used_images.append(selection)
-        logging.info(f"Selected {selection} from {directory}")
+        logging.info("Selected %s from %s", selection, directory)
         return os.path.join(directory, selection)
 
     except Exception as e:
-        logging.error(f"Image selection failed: {str(e)}")
+        logging.error("Image selection failed: %s", e)
         return None
 
 
@@ -104,11 +107,11 @@ def detect_display_server() -> str:
         Current display server: 'x11', 'wayland', or 'unknown'
     """
     server = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
-    logging.info(f"Detected display server: {server}")
+    logging.info("Detected display server: %s", server)
     return server
 
 
-def get_x11_monitors() -> List[str]:
+def get_x11_monitors() -> list[str]:
     """
     Returns connected monitor names using xrandr (X11 only).
 
@@ -117,7 +120,10 @@ def get_x11_monitors() -> List[str]:
     """
     try:
         result = subprocess.run(
-            ["xrandr", "--listmonitors"], capture_output=True, text=True, check=True
+            ["xrandr", "--listmonitors"],
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return [
             line.split()[-1]
@@ -125,11 +131,11 @@ def get_x11_monitors() -> List[str]:
             if "Monitors:" not in line
         ]
     except subprocess.CalledProcessError as e:
-        logging.error(f"xrandr failed: {e.stderr}")
+        logging.error("xrandr failed: %s", e.stderr)
         return []
 
 
-def get_sway_monitors() -> List[str]:
+def get_sway_monitors() -> list[str]:
     """
     Returns active monitor names using swaymsg (Sway/Wayland only).
 
@@ -138,16 +144,19 @@ def get_sway_monitors() -> List[str]:
     """
     try:
         result = subprocess.run(
-            ["swaymsg", "-t", "get_outputs"], capture_output=True, text=True, check=True
+            ["swaymsg", "-t", "get_outputs"],
+            capture_output=True,
+            text=True,
+            check=True,
         )
         outputs = json.loads(result.stdout)
         return [o["name"] for o in outputs if o["active"]]
     except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
-        logging.error(f"swaymsg failed: {str(e)}")
+        logging.error("swaymsg failed: %s", e)
         return []
 
 
-def set_x11_wallpaper(image_paths: List[str]) -> None:
+def set_x11_wallpaper(image_paths: list[str]) -> None:
     """
     Sets wallpapers for all monitors using feh.
 
@@ -156,12 +165,12 @@ def set_x11_wallpaper(image_paths: List[str]) -> None:
     """
     try:
         subprocess.run(["feh", "--bg-fill"] + image_paths, check=True)
-        logging.info(f"Set X11 wallpapers: {image_paths}")
+        logging.info("Set X11 wallpapers: %s", image_paths)
     except subprocess.CalledProcessError as e:
-        logging.error(f"feh failed: {e}")
+        logging.error("feh failed: %s", e)
 
 
-def set_sway_wallpaper(image_paths: List[str], monitors: List[str]) -> None:
+def set_sway_wallpaper(image_paths: list[str], monitors: list[str]) -> None:
     """
     Sets wallpapers for all monitors using swaybg.
 
@@ -175,10 +184,13 @@ def set_sway_wallpaper(image_paths: List[str], monitors: List[str]) -> None:
 
         # Launch new instances for each monitor
         for monitor, image in zip(monitors, image_paths):
-            subprocess.Popen(["swaybg", "-o", monitor, "-i", image, "-m", "fill"])
-        logging.info(f"Set Sway wallpapers: {dict(zip(monitors, image_paths))}")
+            subprocess.Popen(
+                ["swaybg", "-o", monitor, "-i", image, "-m", "fill"]
+            )
+        mapping = dict(zip(monitors, image_paths))
+        logging.info("Set Sway wallpapers: %s", mapping)
     except Exception as e:
-        logging.error(f"swaybg failed: {e}")
+        logging.error("swaybg failed: %s", e)
 
 
 def main() -> None:
@@ -198,11 +210,11 @@ def main() -> None:
         monitors = get_x11_monitors()
 
     monitor_count = len(monitors)
-    logging.info(f"Active monitors ({monitor_count}): {monitors}")
+    logging.info("Active monitors (%d): %s", monitor_count, monitors)
 
     # Select appropriate wallpaper directory strategy
-    used_images: List[str] = []
-    wallpaper_paths: List[str] = []
+    used_images: list[str] = []
+    wallpaper_paths: list[str] = []
 
     if is_sunday:
         # Sunday special case - same directory for all monitors
@@ -219,7 +231,9 @@ def main() -> None:
         # Multi-monitor - alternate between primary and left directories
         for idx in range(monitor_count):
             directory = (
-                WALLPAPER_DIRS["primary"] if idx % 2 == 0 else WALLPAPER_DIRS["left"]
+                WALLPAPER_DIRS["primary"]
+                if idx % 2 == 0
+                else WALLPAPER_DIRS["left"]
             )
             path = get_random_image(directory, used_images)
             if path:
@@ -228,7 +242,9 @@ def main() -> None:
     # Validate selections
     if len(wallpaper_paths) != monitor_count:
         logging.error(
-            f"Selected {len(wallpaper_paths)} wallpapers for {monitor_count} monitors!"
+            "Selected %d wallpapers for %d monitors!",
+            len(wallpaper_paths),
+            monitor_count,
         )
         return
 
@@ -238,7 +254,7 @@ def main() -> None:
     elif display_server == "x11":
         set_x11_wallpaper(wallpaper_paths)
     else:
-        logging.error(f"Unsupported display server: {display_server}")
+        logging.error("Unsupported display server: %s", display_server)
 
 
 if __name__ == "__main__":

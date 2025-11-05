@@ -7,16 +7,17 @@ This module provides pytest fixtures that can be used across test files
 to set up common test environments and mock dependencies.
 """
 
-import os
 import json
-import pytest
-from typing import List, Dict, Any, Generator
-from unittest.mock import patch, MagicMock
+import os
+from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 
 @pytest.fixture
-def mock_wallpaper_dirs(tmp_path: Path) -> Dict[str, str]:
+def mock_wallpaper_dirs(tmp_path: Path) -> dict[str, str]:
     """
     Create temporary wallpaper directories with test images.
 
@@ -72,7 +73,7 @@ def mock_wayland_environment() -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def mock_x11_monitors() -> List[str]:
+def mock_x11_monitors() -> list[str]:
     """
     Mock data for X11 monitor configuration.
 
@@ -83,7 +84,7 @@ def mock_x11_monitors() -> List[str]:
 
 
 @pytest.fixture
-def mock_sway_monitors() -> List[str]:
+def mock_sway_monitors() -> list[str]:
     """
     Mock data for Sway/Wayland monitor configuration.
 

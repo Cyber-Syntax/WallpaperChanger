@@ -7,11 +7,10 @@ This module tests the image selection logic and the main execution flow
 of the wallpaper changer module.
 """
 
-import os
 import datetime
-import pytest
-from unittest.mock import patch, MagicMock, call
-from typing import List, Dict, Optional
+import os
+from unittest.mock import MagicMock, patch
+
 from src import wallpaper
 
 
@@ -33,7 +32,7 @@ class TestImageSelection:
     """Tests for wallpaper image selection functionality."""
 
     def test_get_random_image_success(
-        self, mock_wallpaper_dirs: Dict[str, str]
+        self, mock_wallpaper_dirs: dict[str, str]
     ) -> None:
         """
         Test successful random image selection.
@@ -50,13 +49,15 @@ class TestImageSelection:
             assert result is not None
             assert os.path.exists(result)
             assert os.path.basename(result) in os.listdir(directory)
-            assert len(used_images) == 1  # Should add selected image to used_images
+            assert (
+                len(used_images) == 1
+            )  # Should add selected image to used_images
             mock_log.assert_called_once()
 
     def test_get_random_image_missing_directory(self) -> None:
         """Test handling of non-existent directory."""
         directory = "/path/that/does/not/exist"
-        used_images: List[str] = []
+        used_images: list[str] = []
 
         with patch("os.path.isdir", return_value=False) as mock_isdir:
             with patch("logging.error") as mock_log:
@@ -68,7 +69,7 @@ class TestImageSelection:
                 assert len(used_images) == 0  # Should not modify used_images
 
     def test_get_random_image_no_eligible_images(
-        self, mock_wallpaper_dirs: Dict[str, str]
+        self, mock_wallpaper_dirs: dict[str, str]
     ) -> None:
         """
         Test handling of a directory with no eligible images.
@@ -93,7 +94,7 @@ class TestImageSelection:
     def test_get_random_image_exception(self) -> None:
         """Test handling of an exception during image selection."""
         directory = "/valid/path"
-        used_images: List[str] = []
+        used_images: list[str] = []
 
         # Simulate an exception when listing directory contents
         with patch("os.path.isdir", return_value=True):
@@ -106,7 +107,9 @@ class TestImageSelection:
                     assert result is None
                     mock_listdir.assert_called_once_with(directory)
                     mock_log.assert_called_once()
-                    assert len(used_images) == 0  # Should not modify used_images
+                    assert (
+                        len(used_images) == 0
+                    )  # Should not modify used_images
 
 
 class TestMainExecution:
@@ -133,10 +136,12 @@ class TestMainExecution:
         with patch("src.wallpaper.datetime.datetime", CustomDateTime):
             with patch("logging.info"):
                 with patch(
-                    "src.wallpaper.get_x11_monitors", return_value=mock_monitors
+                    "src.wallpaper.get_x11_monitors",
+                    return_value=mock_monitors,
                 ):
                     with patch(
-                        "src.wallpaper.get_random_image", return_value=wallpaper_path
+                        "src.wallpaper.get_random_image",
+                        return_value=wallpaper_path,
                     ) as mock_get_image:
                         with patch(
                             "src.wallpaper.set_x11_wallpaper"
@@ -146,7 +151,8 @@ class TestMainExecution:
 
                                 # Should get image from primary directory
                                 mock_get_image.assert_called_once_with(
-                                    wallpaper.WALLPAPER_DIRS["primary"], []
+                                    wallpaper.WALLPAPER_DIRS["primary"],
+                                    [],
                                 )
 
                                 # Should set the wallpaper with the selected image
@@ -154,7 +160,9 @@ class TestMainExecution:
                                     [wallpaper_path]
                                 )
 
-    def test_main_multi_monitor_wayland(self, mock_wayland_environment: None) -> None:
+    def test_main_multi_monitor_wayland(
+        self, mock_wayland_environment: None
+    ) -> None:
         """
         Test main execution with multiple monitors on Wayland.
 
@@ -187,7 +195,8 @@ class TestMainExecution:
         with patch("src.wallpaper.datetime.datetime", CustomDateTime):
             with patch("logging.info"):
                 with patch(
-                    "src.wallpaper.get_sway_monitors", return_value=mock_monitors
+                    "src.wallpaper.get_sway_monitors",
+                    return_value=mock_monitors,
                 ):
                     with patch(
                         "src.wallpaper.get_random_image",
@@ -205,7 +214,8 @@ class TestMainExecution:
 
                                 # Verify the first call was with an empty list
                                 mock_get_image.assert_any_call(
-                                    wallpaper.WALLPAPER_DIRS["primary"], []
+                                    wallpaper.WALLPAPER_DIRS["primary"],
+                                    [],
                                 )
 
                                 # Verify the second call was with a list containing the first image
@@ -216,10 +226,13 @@ class TestMainExecution:
 
                                 # Should set wallpapers for all monitors
                                 mock_set_wallpaper.assert_called_once_with(
-                                    [wallpaper_path1, wallpaper_path2], mock_monitors
+                                    [wallpaper_path1, wallpaper_path2],
+                                    mock_monitors,
                                 )
 
-    def test_main_sunday_special_case(self, mock_x11_environment: None) -> None:
+    def test_main_sunday_special_case(
+        self, mock_x11_environment: None
+    ) -> None:
         """
         Test main execution on a Sunday with special wallpaper handling.
 
@@ -252,7 +265,8 @@ class TestMainExecution:
         with patch("src.wallpaper.datetime.datetime", CustomDateTime):
             with patch("logging.info"):
                 with patch(
-                    "src.wallpaper.get_x11_monitors", return_value=mock_monitors
+                    "src.wallpaper.get_x11_monitors",
+                    return_value=mock_monitors,
                 ):
                     with patch(
                         "src.wallpaper.get_random_image",
@@ -269,10 +283,12 @@ class TestMainExecution:
 
                                 # Both calls should be to the Sunday directory
                                 mock_get_image.assert_any_call(
-                                    wallpaper.WALLPAPER_DIRS["sunday"], []
+                                    wallpaper.WALLPAPER_DIRS["sunday"],
+                                    [],
                                 )
                                 mock_get_image.assert_any_call(
-                                    wallpaper.WALLPAPER_DIRS["sunday"], []
+                                    wallpaper.WALLPAPER_DIRS["sunday"],
+                                    [],
                                 )
 
                                 # Should set wallpapers for all monitors
@@ -280,7 +296,9 @@ class TestMainExecution:
                                     [wallpaper_path1, wallpaper_path2]
                                 )
 
-    def test_main_image_selection_failure(self, mock_x11_environment: None) -> None:
+    def test_main_image_selection_failure(
+        self, mock_x11_environment: None
+    ) -> None:
         """
         Test main execution when image selection fails.
 
@@ -299,10 +317,12 @@ class TestMainExecution:
             with patch("logging.info"):
                 with patch("logging.error") as mock_log_error:
                     with patch(
-                        "src.wallpaper.get_x11_monitors", return_value=mock_monitors
+                        "src.wallpaper.get_x11_monitors",
+                        return_value=mock_monitors,
                     ):
                         with patch(
-                            "src.wallpaper.get_random_image", return_value=None
+                            "src.wallpaper.get_random_image",
+                            return_value=None,
                         ) as mock_get_image:
                             with patch(
                                 "src.wallpaper.set_x11_wallpaper"
@@ -312,7 +332,8 @@ class TestMainExecution:
 
                                     # Should try to get image from primary directory
                                     mock_get_image.assert_called_once_with(
-                                        wallpaper.WALLPAPER_DIRS["primary"], []
+                                        wallpaper.WALLPAPER_DIRS["primary"],
+                                        [],
                                     )
 
                                     # Should log an error about mismatched wallpaper count
