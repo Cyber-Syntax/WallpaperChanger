@@ -42,6 +42,15 @@ class ScheduleConfig:
 
 
 @dataclass
+class StateTrackingConfig:
+    """State persistence configuration settings."""
+
+    enabled: bool
+    state_file: Path
+    auto_cleanup: bool
+
+
+@dataclass
 class DirectoryConfig:
     """Wallpaper directory configuration.
 
@@ -78,6 +87,7 @@ class Config:
     logging: LoggingConfig
     schedule: ScheduleConfig
     image_extensions: list[str]
+    state_tracking: StateTrackingConfig
 
     def get_wallpaper_dirs(
         self, is_holiday: bool, is_day: bool
@@ -223,12 +233,14 @@ def load_config(config_path: Path | None = None) -> Config:
     logging_config = _load_logging(parser)
     schedule = _load_schedule(parser)
     image_extensions = _load_image_extensions(parser)
+    state_tracking = _load_state_tracking(parser)
 
     return Config(
         directories=directories,
         logging=logging_config,
         schedule=schedule,
         image_extensions=image_extensions,
+        state_tracking=state_tracking,
     )
 
 
@@ -397,6 +409,49 @@ def _load_image_extensions(parser: configparser.ConfigParser) -> list[str]:
     return extensions
 
 
+def _load_state_tracking(
+    parser: configparser.ConfigParser,
+) -> StateTrackingConfig:
+    """Load state tracking configuration.
+
+    Args:
+        parser: ConfigParser instance
+
+    Returns:
+        StateTrackingConfig with defaults if section not present
+
+    """
+    # Default values
+    enabled = False
+    state_file = (
+        Path.home() / ".local" / "share" / "wallpaperchanger" / "state.json"
+    )
+    auto_cleanup = True
+
+    # Load custom values if section exists
+    if parser.has_section("StateTracking"):
+        enabled = parser.getboolean("StateTracking", "enabled", fallback=False)
+
+        # Only load other settings if state tracking is enabled
+        if enabled:
+            state_file_str = parser.get(
+                "StateTracking",
+                "state_file",
+                fallback=str(state_file),
+            )
+            state_file = Path(state_file_str).expanduser().resolve()
+
+            auto_cleanup = parser.getboolean(
+                "StateTracking", "auto_cleanup", fallback=True
+            )
+
+    return StateTrackingConfig(
+        enabled=enabled,
+        state_file=state_file,
+        auto_cleanup=auto_cleanup,
+    )
+
+
 def _get_path(
     parser: configparser.ConfigParser,
     section: str,
@@ -484,6 +539,51 @@ def create_default_config(config_path: Path | None = None) -> None:
 # WARN: Created by wallpaperchanger, please edit this file to your preferences.
 
 # =============================================================================
+# CONFIGURATION NOTES
+# =============================================================================
+#
+# Directory Structure Example for Time-Based Selection:
+# ----------------------------------------
+# /home/user/Pictures/Wallpapers/
+# ├── workday/
+# │   ├── primary_output/
+# │   │   ├── dark/
+# │   │   │   ├── 0.jpg
+# │   │   │   ├── 1.jpg
+# │   │   │   └── ...
+# │   │   └── light/
+# │   │       ├── 0.jpg
+# │   │       ├── 1.jpg
+# │   │       └── ...
+# │   └── left_output/
+# │       ├── dark/
+# │       │   └── ...
+# │       └── light/
+# │           └── ...
+# └── holiday/
+#     ├── dark/
+#     │   ├── 1.jpg
+#     │   └── ...
+#     └── light/
+#         ├── 3.jpg
+#         └── ...
+#
+# Multi-monitor Behavior:
+# ----------------------
+# - If you have 2 monitors, the script alternates between primary and left
+# - Monitor 0 (primary/right) uses the 'primary' directory
+# - Monitor 1 (left) uses the 'left' directory (if configured)
+# - If 'left' is not configured, both monitors use 'primary'
+# - Used images are tracked per run to avoid duplicates on different monitors
+#
+# Fallback Chain:
+# --------------
+# 1. Time-based directories (Workday/Holiday + Light/Dark)
+# 2. Simple work/holiday directories
+# 3. Basic directories with optional Sunday
+
+
+# =============================================================================
 # TIME-BASED WALLPAPER SELECTION (Day/Night with Work/Holiday)
 # =============================================================================
 # This is the most advanced configuration supporting:
@@ -508,13 +608,13 @@ night_start_time = 18:00
 [Directories.Workday.Light]
 # Primary monitor (or right monitor in multi-monitor setup)
 primary = /home/developer/Pictures/Wallpapers/workday/primary_output/light/
-# Left monitor (optional - comment out if you have only one monitor)
-left = /home/developer/Pictures/Wallpapers/workday/left_output/light/
+# Left monitor (optional)
+#left = /home/developer/Pictures/Wallpapers/workday/left_output/light/
 
 # Workday Dark Theme Directories
 [Directories.Workday.Dark]
 primary = /home/developer/Pictures/Wallpapers/workday/primary_output/dark/
-left = /home/developer/Pictures/Wallpapers/workday/left_output/dark/
+#left = /home/developer/Pictures/Wallpapers/workday/left_output/dark/
 
 # Holiday Light Theme Directories
 [Directories.Holiday.Light]
@@ -588,53 +688,22 @@ primary = /home/developer/Pictures/Wallpapers/holiday/dark/
 # The script will only consider files with these extensions
 extensions = .png,.jpg,.jpeg
 
+# =============================================================================
+# STATE TRACKING (OPTIONAL)
+# =============================================================================
+# Enable state tracking for intelligent wallpaper selection
+[StateTracking]
+# Enable state persistence (disabled by default)
+# When enabled, the script tracks wallpaper history to avoid recent images
+enabled = true
 
-# =============================================================================
-# CONFIGURATION NOTES
-# =============================================================================
-#
-# Directory Structure Example for Time-Based Selection:
-# ----------------------------------------
-# /home/user/Pictures/Wallpapers/
-# ├── workday/
-# │   ├── primary_output/
-# │   │   ├── dark/
-# │   │   │   ├── 0.jpg
-# │   │   │   ├── 1.jpg
-# │   │   │   └── ...
-# │   │   └── light/
-# │   │       ├── 0.jpg
-# │   │       ├── 1.jpg
-# │   │       └── ...
-# │   └── left_output/
-# │       ├── dark/
-# │       │   └── ...
-# │       └── light/
-# │           └── ...
-# └── holiday/
-#     ├── dark/
-#     │   ├── 1.jpg
-#     │   └── ...
-#     └── light/
-#         ├── 3.jpg
-#         └── ...
-#
-# Multi-monitor Behavior:
-# ----------------------
-# - If you have 2 monitors, the script alternates between primary and left
-# - Monitor 0 (primary/right) uses the 'primary' directory
-# - Monitor 1 (left) uses the 'left' directory (if configured)
-# - If 'left' is not configured, both monitors use 'primary'
-# - Used images are tracked per run to avoid duplicates on different monitors
-#
-# Fallback Chain:
-# --------------
-# 1. Time-based directories (Workday/Holiday × Light/Dark)
-# 2. Simple work/holiday directories
-# 3. Basic directories with optional Sunday
-#
-# The script will use the most specific configuration available.
-#
+# Location of state file (default: ~/.local/share/wallpaperchanger/state.json)
+#state_file = ~/.local/share/wallpaperchanger/state.json
+
+# Auto-cleanup old entries (default: true)
+# Prunes history beyond history_limit on each run
+#auto_cleanup = true
 """
 
+    # Write default configuration to file
     config_path.write_text(default_content, encoding="utf-8")

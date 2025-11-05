@@ -34,6 +34,15 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from src.config_loader import Config, create_default_config, load_config
+from src.state_manager import (
+    StateDict,
+    cleanup_old_entries,
+    get_next_wallpaper,
+    initialize_state,
+    load_state,
+    save_state,
+    update_state,
+)
 
 
 def configure_logging(config: Config) -> None:
@@ -63,49 +72,6 @@ def configure_logging(config: Config) -> None:
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
-
-def get_random_image(
-    directory: Path, used_images: list[str], extensions: list[str]
-) -> Path | None:
-    """Selects a random image from a directory, avoiding recently used images.
-
-    Args:
-        directory: Path to search for images
-        used_images: Images to exclude from selection
-        extensions: List of valid image extensions
-
-    Returns:
-        Full path to selected image or None if error
-
-    """
-    try:
-        # Verify directory exists
-        if not directory.is_dir():
-            logging.error("Missing wallpaper directory: %s", directory)
-            return None
-
-        # Get eligible images (case-insensitive check for image extensions)
-        images = [
-            f.name
-            for f in directory.iterdir()
-            if f.is_file()
-            and f.suffix.lower() in extensions
-            and f.name not in used_images
-        ]
-
-        if not images:
-            logging.warning("No unused images found in %s", directory)
-            return None
-
-        selection = random.choice(images)
-        used_images.append(selection)
-        logging.info("Selected %s from %s", selection, directory)
-        return directory / selection
-
-    except Exception as e:
-        logging.error("Image selection failed: %s", e)
-        return None
 
 
 def detect_display_server() -> str:
@@ -214,6 +180,7 @@ def select_wallpapers(
     monitor_count: int,
     is_holiday: bool,
     is_daytime: bool,
+    state: StateDict | None = None,
 ) -> list[Path]:
     """Select appropriate wallpapers based on configuration and context.
 
@@ -222,6 +189,7 @@ def select_wallpapers(
         monitor_count: Number of monitors detected
         is_holiday: Whether today is a configured holiday
         is_daytime: Whether current time is during day hours
+        state: Optional state dictionary for round-robin selection
 
     Returns:
         List of wallpaper paths for each monitor
@@ -246,15 +214,74 @@ def select_wallpapers(
         else:
             directory = wallpaper_dirs["primary"]
 
-        path = get_random_image(
-            directory, used_images, config.image_extensions
-        )
+        # Use round-robin selection if state tracking enabled
+        if state is not None:
+            path = get_next_wallpaper(
+                directory,
+                config.image_extensions,
+                state,
+                used_images,
+            )
+        else:
+            # Fallback to random selection without state
+            path = _select_random_image(
+                directory,
+                config.image_extensions,
+                used_images,
+            )
+
         if path:
             wallpaper_paths.append(path)
         else:
             logging.error("Failed to select wallpaper from %s", directory)
 
     return wallpaper_paths
+
+
+def _select_random_image(
+    directory: Path,
+    extensions: list[str],
+    used_images: list[str],
+) -> Path | None:
+    """Simple random image selection without state tracking.
+
+    Args:
+        directory: Directory to select from
+        extensions: Valid image extensions
+        used_images: Images already selected (for multi-monitor)
+
+    Returns:
+        Path to selected wallpaper or None if error
+
+    """
+    try:
+        if not directory.is_dir():
+            logging.error("Missing wallpaper directory: %s", directory)
+            return None
+
+        all_images = [
+            f.name
+            for f in directory.iterdir()
+            if f.is_file() and f.suffix.lower() in extensions
+        ]
+
+        if not all_images:
+            logging.error("No images found in %s", directory)
+            return None
+
+        # Avoid duplicates if possible
+        available = [img for img in all_images if img not in used_images]
+        if not available:
+            available = all_images
+
+        selection = random.choice(available)
+        used_images.append(selection)
+        logging.info("Random selection: %s from %s", selection, directory.name)
+        return directory / selection
+
+    except Exception as e:
+        logging.error("Image selection failed: %s", e)
+        return None
 
 
 def main() -> None:
@@ -316,6 +343,15 @@ def main() -> None:
     configure_logging(config)
     logging.info("=== Starting wallpaper rotation ===")
 
+    # Load state (if state tracking enabled)
+    state = None
+    if config.state_tracking.enabled:
+        logging.info("State tracking enabled")
+        state = load_state(config.state_tracking.state_file)
+        if state is None:
+            logging.info("Initializing new state file")
+            state = initialize_state()
+
     # Determine current context
     now = datetime.datetime.now()
     weekday = now.weekday()
@@ -348,7 +384,7 @@ def main() -> None:
 
     # Select appropriate wallpapers
     wallpaper_paths = select_wallpapers(
-        config, monitor_count, is_holiday, is_daytime
+        config, monitor_count, is_holiday, is_daytime, state
     )
 
     # Validate selections
@@ -360,6 +396,18 @@ def main() -> None:
         )
         return
 
+    # Update state before setting wallpapers (if state tracking enabled)
+    if state is not None:
+        update_state(
+            state,
+            wallpaper_paths,
+            monitors,
+        )
+
+        # Auto-cleanup if enabled
+        if config.state_tracking.auto_cleanup:
+            cleanup_old_entries(state, max_age_days=30)
+
     # Apply wallpapers
     if display_server == "wayland":
         set_sway_wallpaper(wallpaper_paths, monitors)
@@ -367,6 +415,14 @@ def main() -> None:
         set_x11_wallpaper(wallpaper_paths)
     else:
         logging.error("Unsupported display server: %s", display_server)
+        return
+
+    # Save state after successful execution (if state tracking enabled)
+    if state is not None:
+        if save_state(config.state_tracking.state_file, state):
+            logging.info("State saved successfully")
+        else:
+            logging.warning("Failed to save state, continuing anyway")
 
 
 if __name__ == "__main__":

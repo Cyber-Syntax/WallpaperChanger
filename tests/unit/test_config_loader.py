@@ -17,6 +17,7 @@ from src.config_loader import (
     DirectoryConfig,
     LoggingConfig,
     ScheduleConfig,
+    StateTrackingConfig,
     create_default_config,
     load_config,
 )
@@ -310,6 +311,11 @@ def test_is_holiday() -> None:
             night_start_time=time(18, 0),
         ),
         image_extensions=[".jpg"],
+        state_tracking=StateTrackingConfig(
+            enabled=False,
+            state_file=Path("/tmp/state.json"),
+            auto_cleanup=True,
+        ),
     )
 
     # Monday (0) - not holiday
@@ -338,6 +344,11 @@ def test_is_daytime() -> None:
             night_start_time=time(18, 0),
         ),
         image_extensions=[".jpg"],
+        state_tracking=StateTrackingConfig(
+            enabled=False,
+            state_file=Path("/tmp/state.json"),
+            auto_cleanup=True,
+        ),
     )
 
     # 07:00 - night
@@ -375,6 +386,11 @@ def test_is_daytime_crosses_midnight() -> None:
             night_start_time=time(6, 0),  # Night starts at 06:00
         ),
         image_extensions=[".jpg"],
+        state_tracking=StateTrackingConfig(
+            enabled=False,
+            state_file=Path("/tmp/state.json"),
+            auto_cleanup=True,
+        ),
     )
 
     # 05:00 - day (before night start, after midnight)
