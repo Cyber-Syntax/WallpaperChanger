@@ -243,7 +243,7 @@ def _select_random_image(
     extensions: list[str],
     used_images: list[str],
 ) -> Path | None:
-    """Simple random image selection without state tracking.
+    """Random image selection without state tracking.
 
     Args:
         directory: Directory to select from

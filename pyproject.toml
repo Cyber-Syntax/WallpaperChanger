@@ -1,6 +1,6 @@
 [project]
 name = "wallpaperchanger"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
 description = "Automatically sets wallpapers on Linux using feh (X11) or swaybg (Wayland)."
