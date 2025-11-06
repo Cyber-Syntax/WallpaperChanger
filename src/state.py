@@ -1,21 +1,12 @@
 #!/usr/bin/env python3
-"""State management for WallpaperChanger.
+"""State persistence for wallpaper rotation.
 
-This module handles persistent state tracking for wallpaper selection,
-focusing on round-robin cycling and current wallpaper tracking.
-
-Features:
-- Load/save state from JSON file
-- Atomic writes with corruption recovery
-- Round-robin position tracking per directory
-- Current wallpaper tracking per monitor
-- Concurrent access handling with file locking
+Manages round-robin position and wallpaper history using JSON storage.
 
 Example:
-    >>> from src.state_manager import load_state, save_state
-    >>> state = load_state(Path("~/.local/share/wallpaperchanger/state.json"))
-    >>> if state is None:
-    ...     state = initialize_state()
+    >>> from src.state import load, save, next_wallpaper
+    >>> state_data = load(Path("~/.local/share/wallpaperchanger/state.json"))
+    >>> wallpaper = next_wallpaper(directory, extensions, state_data, [])
 
 """
 
@@ -34,95 +25,30 @@ StateDict = dict[str, Any]
 CURRENT_STATE_VERSION = "1.0"
 
 
-def initialize_state() -> StateDict:
-    """Create default state structure.
-
-    Returns:
-        New state dictionary with default values
-
-    """
-    return {
-        "version": CURRENT_STATE_VERSION,
-        "last_run": None,
-        "current_wallpapers": {},
-        "round_robin": {},
-    }
-
-
-def validate_state(state: StateDict) -> bool:
-    """Validate state structure and required fields.
-
-    Args:
-        state: State dictionary to validate
-
-    Returns:
-        True if state is valid, False otherwise
-
-    """
-    required_fields = ["version", "current_wallpapers", "round_robin"]
-
-    # Check required fields exist
-    for field in required_fields:
-        if field not in state:
-            logging.error("Missing required field in state: %s", field)
-            return False
-
-    # Validate field types
-    if not isinstance(state["version"], str):
-        logging.error("Invalid version field type")
-        return False
-
-    if not isinstance(state["current_wallpapers"], dict):
-        logging.error("Invalid current_wallpapers type")
-        return False
-
-    if not isinstance(state["round_robin"], dict):
-        logging.error("Invalid round_robin type")
-        return False
-
-    # Validate round_robin entries
-    for directory, rr_state in state["round_robin"].items():
-        if not isinstance(rr_state, dict):
-            logging.error("Invalid round_robin entry for %s", directory)
-            return False
-
-        if "images" not in rr_state or "position" not in rr_state:
-            logging.error(
-                "Missing images or position in round_robin for %s", directory
-            )
-            return False
-
-        if not isinstance(rr_state["images"], list) or not isinstance(
-            rr_state["position"], int
-        ):
-            logging.error("Invalid types in round_robin for %s", directory)
-            return False
-
-    return True
-
-
-def load_state(state_file: Path) -> StateDict | None:
+def load(state_file: Path) -> StateDict:
     """Load state from JSON file with corruption recovery.
+
+    Returns default state if file doesn't exist or is corrupted.
 
     Args:
         state_file: Path to state JSON file
 
     Returns:
-        State dictionary or None if file doesn't exist or is corrupted
+        State dictionary (never None)
 
     """
     if not state_file.exists():
         logging.info("State file not found, will create new: %s", state_file)
-        return None
+        return _initialize()
 
     try:
         state_data = state_file.read_text(encoding="utf-8")
         state = json.loads(state_data)
 
-        if not validate_state(state):
+        if not _validate(state):
             raise ValueError("Invalid state schema")
 
-        # Check for version mismatch and migrate if needed
+        # Check for version mismatch
         state_version = state.get("version", "1.0")
         if state_version != CURRENT_STATE_VERSION:
             logging.info(
@@ -138,23 +64,17 @@ def load_state(state_file: Path) -> StateDict | None:
         logging.error("Corrupted state file: %s", e)
 
         # Backup corrupted file
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = state_file.with_suffix(f".corrupted.{timestamp}")
-        try:
-            state_file.rename(backup_path)
-            logging.info("Backed up corrupted state to: %s", backup_path)
-        except OSError as backup_error:
-            logging.error("Failed to backup corrupted state: %s", backup_error)
+        _backup_corrupted(state_file)
 
-        return None
+        return _initialize()
 
     except PermissionError as e:
         logging.error("Permission denied reading state file: %s", e)
-        return None
+        return _initialize()
 
 
-def save_state(state_file: Path, state: StateDict) -> bool:
-    """Save state to JSON file with atomic write and file locking.
+def save(state_file: Path, state: StateDict) -> bool:
+    """Save state to JSON file atomically with file locking.
 
     Uses temp file + rename for atomic operation and fcntl for locking.
 
@@ -209,37 +129,7 @@ def save_state(state_file: Path, state: StateDict) -> bool:
         return False
 
 
-def update_state(
-    state: StateDict,
-    wallpaper_paths: list[Path],
-    monitors: list[str],
-) -> None:
-    """Update state with current wallpaper selection.
-
-    Args:
-        state: State dictionary to update
-        wallpaper_paths: Selected wallpaper paths
-        monitors: Monitor names
-
-    """
-    now = datetime.datetime.now()
-    timestamp = now.isoformat()
-
-    # Update last_run
-    state["last_run"] = timestamp
-
-    # Update current_wallpapers
-    state["current_wallpapers"] = {}
-    for monitor, path in zip(monitors, wallpaper_paths, strict=False):
-        # Convert to Path if string
-        path_obj = Path(path) if isinstance(path, str) else path
-        state["current_wallpapers"][monitor] = {
-            "filename": path_obj.name,
-            "timestamp": timestamp,
-        }
-
-
-def get_next_wallpaper(
+def next_wallpaper(
     directory: Path,
     extensions: list[str],
     state: StateDict | None,
@@ -351,28 +241,133 @@ def get_next_wallpaper(
         return None
 
 
-def cleanup_old_entries(state: StateDict, max_age_days: int = 30) -> None:
-    """Clean up round-robin entries for directories not used recently.
+def update(
+    state: StateDict,
+    wallpaper_paths: list[Path],
+    monitors: list[str],
+) -> None:
+    """Update state with current wallpaper selection.
 
     Args:
-        state: State dictionary to clean
-        max_age_days: Maximum age in days for keeping entries
+        state: State dictionary to update
+        wallpaper_paths: Selected wallpaper paths
+        monitors: Monitor names
 
     """
-    if not state.get("last_run"):
-        return
+    now = datetime.datetime.now()
+    timestamp = now.isoformat()
 
-    try:
-        last_run = datetime.datetime.fromisoformat(state["last_run"])
-        cutoff = datetime.datetime.now() - datetime.timedelta(
-            days=max_age_days
-        )
+    # Update last_run
+    state["last_run"] = timestamp
 
-        if last_run < cutoff:
-            logging.info(
-                "State older than %d days, clearing round-robin", max_age_days
+    # Update current_wallpapers
+    state["current_wallpapers"] = {}
+    for monitor, path in zip(monitors, wallpaper_paths, strict=False):
+        # Convert to Path if string
+        path_obj = Path(path) if isinstance(path, str) else path
+        state["current_wallpapers"][monitor] = {
+            "filename": path_obj.name,
+            "timestamp": timestamp,
+        }
+
+
+# =============================================================================
+# Private Helper Functions
+# =============================================================================
+
+
+def _initialize() -> StateDict:
+    """Create default state structure.
+
+    Returns:
+        New state dictionary with default values
+
+    """
+    return {
+        "version": CURRENT_STATE_VERSION,
+        "last_run": None,
+        "current_wallpapers": {},
+        "round_robin": {},
+    }
+
+
+def _validate(state: StateDict) -> bool:
+    """Validate state structure and required fields.
+
+    Args:
+        state: State dictionary to validate
+
+    Returns:
+        True if state is valid, False otherwise
+
+    """
+    # Check required fields and types
+    if not _validate_basic_structure(state):
+        return False
+
+    # Validate round_robin entries
+    return _validate_round_robin(state["round_robin"])
+
+
+def _validate_basic_structure(state: StateDict) -> bool:
+    """Validate basic state structure and field types."""
+    required_fields = ["version", "current_wallpapers", "round_robin"]
+
+    # Check required fields exist
+    for field in required_fields:
+        if field not in state:
+            logging.error("Missing required field in state: %s", field)
+            return False
+
+    # Validate field types
+    if not isinstance(state["version"], str):
+        logging.error("Invalid version field type")
+        return False
+
+    if not isinstance(state["current_wallpapers"], dict):
+        logging.error("Invalid current_wallpapers type")
+        return False
+
+    if not isinstance(state["round_robin"], dict):
+        logging.error("Invalid round_robin type")
+        return False
+
+    return True
+
+
+def _validate_round_robin(round_robin: dict[str, Any]) -> bool:
+    """Validate round_robin entries."""
+    for directory, rr_state in round_robin.items():
+        if not isinstance(rr_state, dict):
+            logging.error("Invalid round_robin entry for %s", directory)
+            return False
+
+        if "images" not in rr_state or "position" not in rr_state:
+            logging.error(
+                "Missing images or position in round_robin for %s", directory
             )
-            state["round_robin"] = {}
+            return False
 
-    except (ValueError, TypeError) as e:
-        logging.debug("Could not parse last_run timestamp: %s", e)
+        if not isinstance(rr_state["images"], list) or not isinstance(
+            rr_state["position"], int
+        ):
+            logging.error("Invalid types in round_robin for %s", directory)
+            return False
+
+    return True
+
+
+def _backup_corrupted(state_file: Path) -> None:
+    """Backup corrupted state file with timestamp.
+
+    Args:
+        state_file: Path to corrupted state file
+
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = state_file.with_suffix(f".corrupted.{timestamp}")
+    try:
+        state_file.rename(backup_path)
+        logging.info("Backed up corrupted state to: %s", backup_path)
+    except OSError as backup_error:
+        logging.error("Failed to backup corrupted state: %s", backup_error)
