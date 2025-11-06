@@ -12,14 +12,14 @@ from pathlib import Path
 
 import pytest
 
-from src.config_loader import (
+from src.config import (
     Config,
     DirectoryConfig,
     LoggingConfig,
     ScheduleConfig,
     StateTrackingConfig,
-    create_default_config,
-    load_config,
+    create_default,
+    load,
 )
 
 
@@ -87,7 +87,7 @@ def test_load_config_missing_file() -> None:
     with pytest.raises(
         FileNotFoundError, match="Configuration file not found"
     ):
-        load_config(nonexistent_path)
+        load(nonexistent_path)
 
 
 def test_load_config_time_based(
@@ -123,7 +123,7 @@ extensions = .png,.jpg,.jpeg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     assert config.schedule.holiday_days == ["Sunday"]
     assert config.schedule.day_start_time == time(8, 0)
@@ -162,7 +162,7 @@ extensions = .png,.jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     assert config.schedule.holiday_days == ["Saturday", "Sunday"]
     assert (
@@ -198,7 +198,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     assert config.directories.primary == temp_wallpaper_dirs["phase1_primary"]
     assert config.directories.left == temp_wallpaper_dirs["phase1_left"]
@@ -227,7 +227,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     dirs = config.get_wallpaper_dirs(is_holiday=False, is_day=True)
 
@@ -253,7 +253,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     dirs = config.get_wallpaper_dirs(is_holiday=True, is_day=False)
 
@@ -279,7 +279,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     # Should fall back to work/holiday dirs since time-based not configured
     dirs_workday = config.get_wallpaper_dirs(is_holiday=False, is_day=True)
@@ -314,7 +314,6 @@ def test_is_holiday() -> None:
         state_tracking=StateTrackingConfig(
             enabled=False,
             state_file=Path("/tmp/state.json"),
-            auto_cleanup=True,
         ),
     )
 
@@ -347,7 +346,6 @@ def test_is_daytime() -> None:
         state_tracking=StateTrackingConfig(
             enabled=False,
             state_file=Path("/tmp/state.json"),
-            auto_cleanup=True,
         ),
     )
 
@@ -389,7 +387,6 @@ def test_is_daytime_crosses_midnight() -> None:
         state_tracking=StateTrackingConfig(
             enabled=False,
             state_file=Path("/tmp/state.json"),
-            auto_cleanup=True,
         ),
     )
 
@@ -432,7 +429,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     assert config.schedule.holiday_days == ["Friday", "Saturday", "Sunday"]
     assert config.is_holiday(4)  # Friday
@@ -460,7 +457,7 @@ extensions = .jpg
     config_path.write_text(config_content, encoding="utf-8")
 
     with pytest.raises(ValueError, match="Invalid holiday day"):
-        load_config(config_path)
+        load(config_path)
 
 
 def test_invalid_time_format(
@@ -483,7 +480,7 @@ extensions = .jpg
     config_path.write_text(config_content, encoding="utf-8")
 
     with pytest.raises(ValueError, match="Invalid time format"):
-        load_config(config_path)
+        load(config_path)
 
 
 def test_invalid_log_level(
@@ -508,7 +505,7 @@ extensions = .jpg
     config_path.write_text(config_content, encoding="utf-8")
 
     with pytest.raises(ValueError, match="Invalid log_level"):
-        load_config(config_path)
+        load(config_path)
 
 
 def test_logging_defaults(
@@ -528,7 +525,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     assert config.logging.max_size_mb == 1
     assert config.logging.backup_count == 3
@@ -556,7 +553,7 @@ extensions = png,jpg,.jpeg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     # All extensions should have leading dots
     assert all(ext.startswith(".") for ext in config.image_extensions)
@@ -588,7 +585,7 @@ extensions = .jpg
 """
 
     config_path.write_text(config_content, encoding="utf-8")
-    config = load_config(config_path)
+    config = load(config_path)
 
     # Paths should be resolved and absolute
     assert config.directories.primary.is_absolute()
@@ -609,14 +606,14 @@ extensions = .jpg
     config_path.write_text(config_content, encoding="utf-8")
 
     with pytest.raises(ValueError, match="No valid wallpaper directories"):
-        load_config(config_path)
+        load(config_path)
 
 
-def test_create_default_config(temp_config_dir: Path) -> None:
+def test_create_default(temp_config_dir: Path) -> None:
     """Test creating default configuration file."""
     config_path = temp_config_dir / "config.ini"
 
-    create_default_config(config_path)
+    create_default(config_path)
 
     assert config_path.exists()
     content = config_path.read_text(encoding="utf-8")

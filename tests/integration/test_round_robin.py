@@ -7,10 +7,12 @@ Tests the round-robin functionality with the simplified state tracking.
 import tempfile
 from pathlib import Path
 
-from src.state_manager import (
-    get_next_wallpaper,
-    initialize_state,
-    update_state,
+from src.state import (
+    _initialize as initialize_state,
+)
+from src.state import (
+    next_wallpaper,
+    update,
 )
 
 
@@ -35,7 +37,7 @@ class TestRoundRobinSelection:
             selections = []
             for i in range(9):
                 used_images: list[str] = []
-                path = get_next_wallpaper(
+                path = next_wallpaper(
                     wallpaper_dir,
                     extensions,
                     state,
@@ -45,7 +47,7 @@ class TestRoundRobinSelection:
                 selections.append(path.name)
 
                 # Update state
-                update_state(
+                update(
                     state,
                     [path],
                     [f"monitor-{i}"],
@@ -83,7 +85,7 @@ class TestRoundRobinSelection:
             # Simulate 2 monitors selecting wallpapers
             used_images: list[str] = []
 
-            path1 = get_next_wallpaper(
+            path1 = next_wallpaper(
                 wallpaper_dir,
                 extensions,
                 state,
@@ -92,7 +94,7 @@ class TestRoundRobinSelection:
             assert path1 is not None
             assert path1.name == "image1.jpg"
 
-            path2 = get_next_wallpaper(
+            path2 = next_wallpaper(
                 wallpaper_dir,
                 extensions,
                 state,
@@ -119,7 +121,7 @@ class TestRoundRobinSelection:
             selections = []
             for i in range(5):
                 used_images: list[str] = []
-                path = get_next_wallpaper(
+                path = next_wallpaper(
                     wallpaper_dir,
                     extensions,
                     state,
@@ -128,7 +130,7 @@ class TestRoundRobinSelection:
                 assert path is not None
                 selections.append(path.name)
 
-                update_state(
+                update(
                     state,
                     [path],
                     [f"monitor-{i}"],
@@ -152,7 +154,7 @@ class TestRoundRobinSelection:
 
             # First selection
             used_images: list[str] = []
-            path1 = get_next_wallpaper(
+            path1 = next_wallpaper(
                 wallpaper_dir,
                 extensions,
                 state,
@@ -162,7 +164,7 @@ class TestRoundRobinSelection:
 
             # Second selection
             used_images = []
-            path2 = get_next_wallpaper(
+            path2 = next_wallpaper(
                 wallpaper_dir,
                 extensions,
                 state,
@@ -175,7 +177,7 @@ class TestRoundRobinSelection:
 
             # Should reset to first image in new list
             used_images = []
-            path3 = get_next_wallpaper(
+            path3 = next_wallpaper(
                 wallpaper_dir,
                 extensions,
                 state,
@@ -199,9 +201,9 @@ class TestRoundRobinSelection:
 
             # Get first 3 selections
             selections = []
-            for i in range(3):
+            for _i in range(3):
                 used_images: list[str] = []
-                path = get_next_wallpaper(
+                path = next_wallpaper(
                     wallpaper_dir,
                     extensions,
                     state,
@@ -231,22 +233,22 @@ class TestRoundRobinSelection:
 
             # Select from dir1
             used_images: list[str] = []
-            path1 = get_next_wallpaper(dir1, extensions, state, used_images)
+            path1 = next_wallpaper(dir1, extensions, state, used_images)
             assert path1.name == "image1.jpg"
 
             # Select from dir2
             used_images = []
-            path2 = get_next_wallpaper(dir2, extensions, state, used_images)
+            path2 = next_wallpaper(dir2, extensions, state, used_images)
             assert path2.name == "imageA.jpg"
 
             # Select from dir1 again
             used_images = []
-            path3 = get_next_wallpaper(dir1, extensions, state, used_images)
+            path3 = next_wallpaper(dir1, extensions, state, used_images)
             assert path3.name == "image2.jpg"
 
             # Select from dir2 again
             used_images = []
-            path4 = get_next_wallpaper(dir2, extensions, state, used_images)
+            path4 = next_wallpaper(dir2, extensions, state, used_images)
             assert path4.name == "imageB.jpg"
 
             # Both should cycle independently

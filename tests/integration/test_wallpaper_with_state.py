@@ -13,18 +13,21 @@ import tempfile
 from datetime import time
 from pathlib import Path
 
-from src.config_loader import (
+from src.config import (
     Config,
     DirectoryConfig,
     LoggingConfig,
     ScheduleConfig,
     StateTrackingConfig,
 )
-from src.state_manager import (
-    get_next_wallpaper,
-    initialize_state,
-    load_state,
-    save_state,
+from src.state import (
+    _initialize as initialize_state,
+)
+from src.state import (
+    load,
+    next_wallpaper,
+    save,
+    update,
 )
 from src.wallpaper import select_wallpapers
 
@@ -66,7 +69,6 @@ class TestWallpaperWithStateTracking:
                 state_tracking=StateTrackingConfig(
                     enabled=True,
                     state_file=state_file,
-                    auto_cleanup=True,
                 ),
             )
 
@@ -79,27 +81,24 @@ class TestWallpaperWithStateTracking:
                 monitor_count=2,
                 is_holiday=False,
                 is_daytime=True,
-                state=state,
+                state_data=state,
             )
 
             assert len(wallpaper_paths) == 2
             assert all(p.exists() for p in wallpaper_paths)
 
             # Update state with selections (this sets last_run)
-            from src.state_manager import update_state
-
-            update_state(
+            update(
                 state,
                 wallpaper_paths,
                 ["HDMI-0", "DP-1"],
             )
 
             # Save state
-            save_state(state_file, state)
+            save(state_file, state)
 
             # Load state and verify
-            loaded_state = load_state(state_file)
-            assert loaded_state is not None
+            loaded_state = load(state_file)
             assert loaded_state["last_run"] is not None
 
     def test_round_robin_across_runs(self) -> None:
@@ -119,37 +118,34 @@ class TestWallpaperWithStateTracking:
             # First run
             state = initialize_state()
             used_images: list[str] = []
-            path1 = get_next_wallpaper(
+            path1 = next_wallpaper(
                 wallpaper_dir, extensions, state, used_images
             )
             assert path1.name == "image1.jpg"
-            save_state(state_file, state)
+            save(state_file, state)
 
             # Second run (load state)
-            state = load_state(state_file)
-            assert state is not None
+            state = load(state_file)
             used_images = []
-            path2 = get_next_wallpaper(
+            path2 = next_wallpaper(
                 wallpaper_dir, extensions, state, used_images
             )
             assert path2.name == "image2.jpg"
-            save_state(state_file, state)
+            save(state_file, state)
 
             # Third run
-            state = load_state(state_file)
-            assert state is not None
+            state = load(state_file)
             used_images = []
-            path3 = get_next_wallpaper(
+            path3 = next_wallpaper(
                 wallpaper_dir, extensions, state, used_images
             )
             assert path3.name == "image3.jpg"
-            save_state(state_file, state)
+            save(state_file, state)
 
             # Fourth run should wrap around
-            state = load_state(state_file)
-            assert state is not None
+            state = load(state_file)
             used_images = []
-            path4 = get_next_wallpaper(
+            path4 = next_wallpaper(
                 wallpaper_dir, extensions, state, used_images
             )
             assert path4.name == "image1.jpg"
@@ -187,7 +183,6 @@ class TestWallpaperWithStateTracking:
                 state_tracking=StateTrackingConfig(
                     enabled=False,
                     state_file=Path(tmpdir) / "state.json",
-                    auto_cleanup=True,
                 ),
             )
 
@@ -197,7 +192,7 @@ class TestWallpaperWithStateTracking:
                 monitor_count=1,
                 is_holiday=False,
                 is_daytime=True,
-                state=None,
+                state_data=None,
             )
 
             assert len(wallpaper_paths) == 1
@@ -242,7 +237,6 @@ class TestWallpaperWithStateTracking:
                 state_tracking=StateTrackingConfig(
                     enabled=True,
                     state_file=state_file,
-                    auto_cleanup=True,
                 ),
             )
 
@@ -255,7 +249,7 @@ class TestWallpaperWithStateTracking:
                 monitor_count=2,
                 is_holiday=False,
                 is_daytime=True,
-                state=state,
+                state_data=state,
             )
 
             assert len(wallpaper_paths) == 2
@@ -267,7 +261,7 @@ class TestWallpaperWithStateTracking:
         with tempfile.TemporaryDirectory() as tmpdir:
             wallpaper_dir = Path(tmpdir) / "wallpapers"
             wallpaper_dir.mkdir()
-            state_file = Path(tmpdir) / "state.json"
+            Path(tmpdir) / "state.json"
 
             # Start with 2 images
             (wallpaper_dir / "image1.jpg").touch()
@@ -278,7 +272,7 @@ class TestWallpaperWithStateTracking:
 
             # First selection
             used_images: list[str] = []
-            path1 = get_next_wallpaper(
+            path1 = next_wallpaper(
                 wallpaper_dir, extensions, state, used_images
             )
             assert path1.name == "image1.jpg"
@@ -288,7 +282,7 @@ class TestWallpaperWithStateTracking:
 
             # Next selection should detect change and reset
             used_images = []
-            path2 = get_next_wallpaper(
+            path2 = next_wallpaper(
                 wallpaper_dir, extensions, state, used_images
             )
             # Position should reset due to directory change
