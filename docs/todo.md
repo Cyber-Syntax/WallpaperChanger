@@ -2,10 +2,10 @@
 
 ## testing
 
-## in-progress
-
 - [ ] code structure refactor for better organization and maintainability
 - [ ] Performance optimization
+
+## in-progress
 
 ## todo
 

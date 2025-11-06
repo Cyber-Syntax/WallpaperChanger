@@ -1,43 +1,97 @@
 ## Troubleshooting
 
-### Check Logs
+This page lists concise steps to diagnose and fix common problems. Follow items in order.
 
-Logs are stored in `~/.local/share/wallpaperchanger/logs/main.log` by default.
+Logs
 
-```bash
-# View recent logs
-tail -f ~/.local/share/wallpaperchanger/logs/main.log
+- Default log file: `~/.local/share/wallpaperchanger/logs/main.log`
+- View recent entries:
+    - `tail -n 200 ~/.local/share/wallpaperchanger/logs/main.log`
+- Follow live output:
+    - `tail -f ~/.local/share/wallpaperchanger/logs/main.log`
+- Check file permissions if logs are missing or empty.
 
-# View all logs
-cat ~/.local/share/wallpaperchanger/logs/main.log
-```
+Quick checks
 
-### Common Issues
+1. Confirm the program runs:
+    - `python main.py`
+    - The program exits after applying wallpapers; check logs for details.
+2. Validate configuration:
+    - `python -m src.cli validate_config`
+    - This prints a short summary of configured directories, image counts,
+      schedule, logging and state settings.
+3. If no config exists, the program will create a default template at:
+    - `~/.config/wallpaperchanger/config.ini`
+    - Edit that file and set at least one wallpaper directory.
 
-**Configuration file not found:**
+Common issues and fixes
 
-This should not happen as the script auto-creates the config on first run. If you deleted the config file, simply run the script again:
+Issue: "Configuration file not found" or program creates default and exits
 
-```bash
-python main.py
-# Config will be auto-created
-```
+- Cause: No config present on first run.
+- Fix: Edit `~/.config/wallpaperchanger/config.ini` and set `primary` (or
+  time-based/work-holiday keys) to an existing directory with images.
+- Re-run `python main.py` after editing.
 
-**No valid wallpaper directories configured:**
+Issue: "No valid wallpaper directories configured"
 
-- Ensure at least one directory configuration is complete in your config.ini
-- Check that the directories exist and contain image files
-- Verify directory paths are correct (use absolute paths or ~ for home)
+- Cause: No directory keys set or all referenced directories are missing.
+- Fix:
+    - Ensure at least one of these is configured:
+        - Any `Directories.Workday.*` or `Directories.Holiday.*` section with `primary`
+        - `workday_primary` / `holiday_primary` under `[Directories]`
+        - `primary` under `[Directories]`
+    - Use absolute paths or `~` and verify directories exist:
+        - `ls -la /path/to/dir`
 
-**Wallpaper not changing:**
+Issue: Wallpapers not changing
 
-- Check that image files have supported extensions (.png, .jpg, .jpeg)
-- Verify the script is being executed (check logs)
-- For Wayland: ensure `swaybg` is installed
-- For X11: ensure `feh` is installed
+- Verify image files use allowed extensions configured in `[Images]`.
+- Confirm the display server helper is available:
+    - X11: `feh` (used by `src.wallpaper.set_x11_wallpaper`)
+    - Wayland (sway): `swaybg` or configured Wayland tool
+- Check logs for errors about command execution or detection.
 
-**Wrong wallpapers being selected:**
+Issue: Wrong wallpaper selection (time/day/holiday mismatch)
 
-- Check your current time matches your `day_start_time` and `night_start_time`
-- Verify today's weekday matches your `holiday_days` configuration
-- Review logs to see which directories are being selected
+- Verify `[Schedule]` settings in the config:
+    - `holiday_days` must use day names (`Monday`, `Tuesday`, ..., `Sunday`)
+    - `day_start_time` and `night_start_time` must be `HH:MM`
+- Use validator to print the active schedule and times:
+    - `python -m src.cli validate_config`
+
+Issue: No images counted in directories
+
+- Confirm files are regular files (not symlinks to missing targets).
+- Confirm suffix matches configured extensions (case-insensitive).
+- Example small test:
+    - `python -c "from pathlib import Path; print(list(Path('/path/to/dir').glob('*.jpg')))"`
+
+Display and monitors
+
+- To debug monitor detection behavior, check `src.wallpaper` functions:
+    - The program logs detected display server and monitor list.
+- If the program detects 0 monitors, check your environment:
+    - Are you running under a graphical session?
+    - For headless or SSH sessions, monitor detection will fail.
+
+Permissions
+
+- If the program cannot read directories or write logs/state, check:
+    - Ownership and permissions of configured directories and the log/state paths.
+    - Use `chmod`/`chown` appropriately.
+
+When to escalate
+
+- If logs show an exception you cannot resolve, capture:
+    - The relevant part of `main.log`
+    - Your `~/.config/wallpaperchanger/config.ini`
+    - The output of `python main.py` (stderr)
+- File an issue for help including the above details.
+
+Minimal diagnostic checklist (copy/paste)
+
+- `python -m src.cli validate_config`
+- `tail -n 200 ~/.local/share/wallpaperchanger/logs/main.log`
+- `ls -la <your-configured-directory>`
+- Ensure `feh` (X11) or `swaybg` (Wayland) is installed if needed

@@ -1,42 +1,53 @@
-## Development
+# Development
 
-### Running Tests
+This document is a concise reference for common development tasks:
+setting up the environment, running the program, running tests, and basic
+contribution guidance. Keep changes small and explicit.
 
-```bash
-# Run all tests
-python -m pytest
+Prerequisites
 
-# Run with coverage
-python -m pytest --cov=src
+- Python 3.10+ (project uses modern typing and dataclasses).
 
-# Run specific test file
-python -m pytest tests/unit/test_config_loader.py -v
-```
+Setup (recommended)
 
-### Project Structure
+1. Create and activate a virtual environment at the repo root:
+    - bash / sh:
+        - `python -m venv .venv`
+        - `source .venv/bin/activate`
+2. Install development dependencies (if you have a `requirements-dev.txt`
+   or similar). If none are provided, installing `pytest` is sufficient to
+   run tests:
+    - `pip install -U pip`
+    - `pip install pytest`
 
-```
-WallpaperChanger/
-├── src/
-│   ├── wallpaper.py       # Main wallpaper changer logic
-│   ├── config_loader.py   # Configuration file parser
-│   └── init_config.py     # Config initialization helper
-├── config/
-│   └── config.ini.example # Example configuration file
-├── tests/
-│   └── unit/
-│       └── test_config_loader.py
-├── plan/
-│   └── CONFIG_IMPROVEMENT_PLAN.md
-└── README.md
-```
+Project layout (important files only)
 
-## Philosophy
+- `main.py` — program entry point; calls `src.cli.run()`.
+- `src/cli.py` — CLI helpers and `run()` implementation.
+- `src/config.py` — configuration loader, validator, default template.
+- `src/wallpaper.py` — display-server detection and wallpaper application.
+- `src/state.py` — optional state persistence.
+- `docs/` — documentation (this file included).
+- `tests/` — unit tests (if present).
 
-WallpaperChanger follows these principles:
+Running the program
 
-- **Simple**: Do one thing well - set wallpapers
-- **Fast**: Run and exit immediately, no background processes
-- **Reliable**: Minimal dependencies, clear error messages
-- **Configurable**: User-friendly config files, no code editing
-- **Maintainable**: Clean code, comprehensive tests, good documentation
+- Create or edit the configuration:
+    - The default config path is `~/.config/wallpaperchanger/config.ini`.
+    - The program creates a default template if none exists.
+- To run the wallpaper rotation once:
+    - `python main.py`
+- Create the default config programmatically:
+    - `python -c "from src.cli import init_config; init_config()"`
+- Validate configuration programmatically:
+    - `python -c "from src.cli import validate_config; validate_config()"`
+
+Running tests
+
+- Ensure your virtualenv is activated.
+- Run all tests:
+    - `pytest -v -q --strict-markers`
+- Run a specific test file:
+    - `pytest tests/test_config.py -v`
+- Run a single test function:
+    - `pytest tests/test_config.py::test_function_name -q`

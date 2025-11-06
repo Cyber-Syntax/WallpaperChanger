@@ -9,14 +9,13 @@ A simple, fast, and configurable wallpaper manager for Linux that automatically 
 
 ## Features
 
-✨ **Configuration-Based**: User-friendly `config.ini` file
-📅 **Flexible Scheduling**: Configure custom holiday days (not just Sunday)
-🌓 **Time-Based Themes**: Different wallpapers for day/night
-💼 **Work/Holiday Distinction**: Separate wallpaper sets for workdays and holidays
-🖥️ **Multi-Monitor Support**: Smart wallpaper distribution across monitors
-🔄 **No Duplicates**: Prevents same image on multiple monitors in a single run
-📊 **Logging**: Rotating logs for troubleshooting
-⚡ **Fast & Lightweight**: Runs and exits immediately - no background processes
+- ✨ **Configuration-Based**: User-friendly `config.ini` file
+- 📅 **Flexible Scheduling**: Configure custom holiday days (not just Sunday)
+- 🌓 **Time-Based Themes**: Different wallpapers for day/night
+- 💼 **Work/Holiday Distinction**: Separate wallpaper sets for workdays and holidays
+- 🖥️ **Multi-Monitor Support**: Smart wallpaper distribution across monitors (Experimental)
+- 📊 **Logging**: Rotating logs for troubleshooting
+- ⚡ **Fast & Lightweight**: Runs and exits immediately - no background processes
 
 ## Requirements
 
