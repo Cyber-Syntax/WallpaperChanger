@@ -43,7 +43,6 @@ def main() -> None:
         print("4. Run the wallpaper changer:")
         print("   python -m src.wallpaper")
         print("\nFor help, see the example config at:")
-        print("   config/config.ini.example")
     except Exception as e:
         print(f"Error creating configuration: {e}", file=sys.stderr)
         sys.exit(1)

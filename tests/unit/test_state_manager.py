@@ -19,11 +19,9 @@ from pathlib import Path
 from src.state_manager import (
     CURRENT_STATE_VERSION,
     cleanup_old_entries,
-    clear_state_history,
     get_next_wallpaper,
     initialize_state,
     load_state,
-    restore_wallpapers,
     save_state,
     update_state,
     validate_state,
@@ -382,83 +380,6 @@ class TestRoundRobinSelection:
         assert result2.name == "image1.jpg"
 
 
-class TestClearHistory:
-    """Tests for clearing state."""
-
-    def test_clear_state_history_keep_current(self):
-        """Test clearing state while keeping current wallpapers."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            state_file = Path(tmpdir) / "state.json"
-            state = initialize_state()
-            state["last_run"] = "2024-01-15T10:00:00"
-            state["current_wallpapers"]["HDMI-0"] = {
-                "filename": "test.jpg",
-                "timestamp": "2024-01-15T10:00:00",
-            }
-            state["round_robin"]["/path/to/dir"] = {
-                "images": ["img1.jpg"],
-                "position": 5,
-            }
-
-            save_state(state_file, state)
-            clear_state_history(state_file, keep_current=True)
-            loaded_state = load_state(state_file)
-
-            assert loaded_state["round_robin"] == {}
-            assert (
-                loaded_state["current_wallpapers"]["HDMI-0"]["filename"]
-                == "test.jpg"
-            )
-            assert loaded_state["last_run"] == "2024-01-15T10:00:00"
-
-    def test_clear_state_history_clear_all(self):
-        """Test clearing entire state."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            state_file = Path(tmpdir) / "state.json"
-            state = initialize_state()
-            state["last_run"] = "2024-01-15T10:00:00"
-            state["current_wallpapers"]["HDMI-0"] = {
-                "filename": "test.jpg",
-                "timestamp": "2024-01-15T10:00:00",
-            }
-
-            save_state(state_file, state)
-            clear_state_history(state_file, keep_current=False)
-            loaded_state = load_state(state_file)
-
-            assert loaded_state["round_robin"] == {}
-            assert loaded_state["current_wallpapers"] == {}
-            assert loaded_state["last_run"] is None
-
-    def test_clear_state_history_nonexistent_file(self):
-        """Test clearing nonexistent state file returns False."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            state_file = Path(tmpdir) / "nonexistent.json"
-            result = clear_state_history(state_file)
-            assert result is False
-
-
-class TestRestoreWallpapers:
-    """Tests for wallpaper restoration."""
-
-    def test_restore_wallpapers_not_implemented(self):
-        """Test that restore_wallpapers returns None (not implemented)."""
-        state = initialize_state()
-        state["current_wallpapers"]["HDMI-0"] = {
-            "filename": "test.jpg",
-            "timestamp": "2024-01-15T10:00:00",
-        }
-
-        result = restore_wallpapers(state)
-        assert result is None
-
-    def test_restore_wallpapers_empty_state(self):
-        """Test restoring with empty current_wallpapers."""
-        state = initialize_state()
-        result = restore_wallpapers(state)
-        assert result is None
-
-
 class TestCleanupOldEntries:
     """Tests for cleanup of old round-robin entries."""
 
@@ -502,42 +423,3 @@ class TestCleanupOldEntries:
 
         # Should not crash, round_robin should remain unchanged
         assert state["round_robin"] != {}
-
-
-class TestDisplayCurrentState:
-    """Tests for display_current_state."""
-
-    def test_display_current_state_with_data(self, capsys):
-        """Test displaying state with wallpapers."""
-        from src.state_manager import display_current_state
-
-        state = initialize_state()
-        state["last_run"] = "2024-01-15T10:00:00"
-        state["current_wallpapers"]["HDMI-0"] = {
-            "filename": "test.jpg",
-            "timestamp": "2024-01-15T10:00:00",
-        }
-        state["round_robin"]["/path/to/dir"] = {
-            "images": ["img1.jpg", "img2.jpg"],
-            "position": 1,
-        }
-
-        display_current_state(state)
-        captured = capsys.readouterr()
-
-        assert "2024-01-15T10:00:00" in captured.out
-        assert "HDMI-0" in captured.out
-        assert "test.jpg" in captured.out
-        assert "Round-Robin State" in captured.out
-
-    def test_display_current_state_empty(self, capsys):
-        """Test displaying empty state."""
-        from src.state_manager import display_current_state
-
-        state = initialize_state()
-
-        display_current_state(state)
-        captured = capsys.readouterr()
-
-        assert "None" in captured.out
-        assert "No current wallpapers recorded" in captured.out

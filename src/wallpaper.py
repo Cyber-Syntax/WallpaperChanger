@@ -7,7 +7,8 @@ This script selects wallpapers from designated directories depending on:
 - Number of connected monitors
 - Current display server (X11 or Wayland/Sway)
 
-Wallpapers are set using appropriate tools (feh for X11, swaybg for Sway on Wayland).
+Wallpapers are set using appropriate tools (feh for X11, swaybg for Sway
+on Wayland).
 
 Features:
 - Configurable holidays (not just Sunday)
@@ -27,7 +28,6 @@ import datetime
 import json
 import logging
 import os
-import random
 import subprocess
 import sys
 from logging.handlers import RotatingFileHandler
@@ -46,7 +46,7 @@ from src.state_manager import (
 
 
 def configure_logging(config: Config) -> None:
-    """Sets up rotating logs with timestamps and severity levels.
+    """Configure rotating logs with timestamps and severity levels.
 
     Args:
         config: Application configuration with logging settings
@@ -75,7 +75,7 @@ def configure_logging(config: Config) -> None:
 
 
 def detect_display_server() -> str:
-    """Identifies the current display server environment.
+    """Detect the current display server environment.
 
     Returns:
         Current display server: 'x11', 'wayland', or 'unknown'
@@ -87,7 +87,7 @@ def detect_display_server() -> str:
 
 
 def get_x11_monitors() -> list[str]:
-    """Returns connected monitor names using xrandr (X11 only).
+    """Get connected monitor names using xrandr (X11 only).
 
     Returns:
         List of connected monitor names
@@ -112,7 +112,7 @@ def get_x11_monitors() -> list[str]:
 
 
 def get_sway_monitors() -> list[str]:
-    """Returns active monitor names using swaymsg (Sway/Wayland only).
+    """Get active monitor names using swaymsg (Sway/Wayland only).
 
     Returns:
         List of active monitor names
@@ -137,7 +137,7 @@ def get_sway_monitors() -> list[str]:
 
 
 def set_x11_wallpaper(image_paths: list[Path]) -> None:
-    """Sets wallpapers for all monitors using feh.
+    """Set wallpapers for all monitors using feh.
 
     Args:
         image_paths: Ordered list of wallpaper paths per monitor
@@ -153,7 +153,7 @@ def set_x11_wallpaper(image_paths: list[Path]) -> None:
 
 
 def set_sway_wallpaper(image_paths: list[Path], monitors: list[str]) -> None:
-    """Sets wallpapers for all monitors using swaybg.
+    """Set wallpapers for all monitors using swaybg.
 
     Args:
         image_paths: Ordered list of wallpaper paths per monitor
@@ -214,21 +214,13 @@ def select_wallpapers(
         else:
             directory = wallpaper_dirs["primary"]
 
-        # Use round-robin selection if state tracking enabled
-        if state is not None:
-            path = get_next_wallpaper(
-                directory,
-                config.image_extensions,
-                state,
-                used_images,
-            )
-        else:
-            # Fallback to random selection without state
-            path = _select_random_image(
-                directory,
-                config.image_extensions,
-                used_images,
-            )
+        # Use get_next_wallpaper for both random and round-robin selection
+        path = get_next_wallpaper(
+            directory,
+            config.image_extensions,
+            state,
+            used_images,
+        )
 
         if path:
             wallpaper_paths.append(path)
@@ -238,60 +230,15 @@ def select_wallpapers(
     return wallpaper_paths
 
 
-def _select_random_image(
-    directory: Path,
-    extensions: list[str],
-    used_images: list[str],
-) -> Path | None:
-    """Random image selection without state tracking.
-
-    Args:
-        directory: Directory to select from
-        extensions: Valid image extensions
-        used_images: Images already selected (for multi-monitor)
-
-    Returns:
-        Path to selected wallpaper or None if error
-
-    """
-    try:
-        if not directory.is_dir():
-            logging.error("Missing wallpaper directory: %s", directory)
-            return None
-
-        all_images = [
-            f.name
-            for f in directory.iterdir()
-            if f.is_file() and f.suffix.lower() in extensions
-        ]
-
-        if not all_images:
-            logging.error("No images found in %s", directory)
-            return None
-
-        # Avoid duplicates if possible
-        available = [img for img in all_images if img not in used_images]
-        if not available:
-            available = all_images
-
-        selection = random.choice(available)
-        used_images.append(selection)
-        logging.info("Random selection: %s from %s", selection, directory.name)
-        return directory / selection
-
-    except Exception as e:
-        logging.error("Image selection failed: %s", e)
-        return None
-
-
 def main() -> None:
-    """Main execution flow to set wallpapers based on current configuration."""
+    """Run main execution flow to set wallpapers based on configuration."""
     config_path = Path.home() / ".config" / "wallpaperchanger" / "config.ini"
 
     # Auto-create default config on first run
     if not config_path.exists():
         print(
-            "⚠️  Configuration file not found. Creating default configuration...",
+            "⚠️  Configuration file not found. "
+            "Creating default configuration...",
             file=sys.stderr,
         )
         try:
@@ -301,16 +248,19 @@ def main() -> None:
                 file=sys.stderr,
             )
             print(
-                "\n⚠️  IMPORTANT: Please edit the configuration file to set your wallpaper directories!",
+                "\n⚠️  IMPORTANT: Please edit the configuration file to "
+                "set your wallpaper directories!",
                 file=sys.stderr,
             )
             print(f"   Edit: {config_path}", file=sys.stderr)
             print(
-                "\nThe default configuration is set for a specific user setup.",
+                "\nThe default configuration is set for a specific user "
+                "setup.",
                 file=sys.stderr,
             )
             print(
-                "You MUST update the paths to match your system to avoid errors.\n",
+                "You MUST update the paths to match your system to avoid "
+                "errors.\n",
                 file=sys.stderr,
             )
             print(

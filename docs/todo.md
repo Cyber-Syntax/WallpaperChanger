@@ -2,21 +2,24 @@
 
 ## testing
 
-- [ ] Configuration file
-- [ ] State file
-
 ## in-progress
+
+- [ ] code structure refactor for better organization and maintainability
+- [ ] Performance optimization
+
+## todo
 
 - [ ] cli interface
 - [ ] uv usage for package creation
 
-## todo
-
-- [ ] code structure refactor for better organization and maintainability
-- [ ] Performance optimization
 - [ ] systemd service/timer setups for day/night mode
 - [ ] add proper documentation
 
-## backlog 
+## backlog
 
 - [ ] test with multiple monitors
+
+## done
+
+- [x] Configuration file
+- [x] State file

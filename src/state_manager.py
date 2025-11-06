@@ -24,13 +24,12 @@ import datetime
 import fcntl
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Any
 
-# Type aliases for state structure
+# Type alias for state structure
 StateDict = dict[str, Any]
-WallpaperInfo = dict[str, str]
-RoundRobinDict = dict[str, dict[str, Any]]
 
 CURRENT_STATE_VERSION = "1.0"
 
@@ -60,23 +59,19 @@ def validate_state(state: StateDict) -> bool:
         True if state is valid, False otherwise
 
     """
-    required_fields = [
-        "version",
-        "current_wallpapers",
-        "round_robin",
-    ]
+    required_fields = ["version", "current_wallpapers", "round_robin"]
 
+    # Check required fields exist
     for field in required_fields:
         if field not in state:
             logging.error("Missing required field in state: %s", field)
             return False
 
-    # Validate version
+    # Validate field types
     if not isinstance(state["version"], str):
         logging.error("Invalid version field type")
         return False
 
-    # Validate structure types
     if not isinstance(state["current_wallpapers"], dict):
         logging.error("Invalid current_wallpapers type")
         return False
@@ -85,7 +80,7 @@ def validate_state(state: StateDict) -> bool:
         logging.error("Invalid round_robin type")
         return False
 
-    # Validate round_robin structure
+    # Validate round_robin entries
     for directory, rr_state in state["round_robin"].items():
         if not isinstance(rr_state, dict):
             logging.error("Invalid round_robin entry for %s", directory)
@@ -97,16 +92,10 @@ def validate_state(state: StateDict) -> bool:
             )
             return False
 
-        if not isinstance(rr_state["images"], list):
-            logging.error(
-                "Invalid images type in round_robin for %s", directory
-            )
-            return False
-
-        if not isinstance(rr_state["position"], int):
-            logging.error(
-                "Invalid position type in round_robin for %s", directory
-            )
+        if not isinstance(rr_state["images"], list) or not isinstance(
+            rr_state["position"], int
+        ):
+            logging.error("Invalid types in round_robin for %s", directory)
             return False
 
     return True
@@ -253,15 +242,16 @@ def update_state(
 def get_next_wallpaper(
     directory: Path,
     extensions: list[str],
-    state: StateDict,
+    state: StateDict | None,
     used_images: list[str],
 ) -> Path | None:
-    """Get next wallpaper using round-robin selection.
+    """Get next wallpaper using round-robin or random selection.
 
     Args:
         directory: Directory to select from
         extensions: Valid image extensions
-        state: State dictionary with round_robin tracking
+        state: Optional state dictionary with round_robin tracking.
+               If None, uses random selection instead.
         used_images: Images already selected (for multi-monitor)
 
     Returns:
@@ -287,7 +277,20 @@ def get_next_wallpaper(
             logging.error("No images found in %s", directory)
             return None
 
-        # Get directory key for round_robin state
+        # Use random selection if no state tracking
+        if state is None:
+            available = [img for img in all_images if img not in used_images]
+            if not available:
+                available = all_images
+
+            selected = random.choice(available)
+            used_images.append(selected)
+            logging.info(
+                "Random selection: %s from %s", selected, directory.name
+            )
+            return directory / selected
+
+        # Round-robin selection with state tracking
         dir_key = str(directory.resolve())
 
         # Initialize round_robin state for this directory if needed
@@ -346,89 +349,6 @@ def get_next_wallpaper(
     except Exception as e:
         logging.error("Image selection failed: %s", e)
         return None
-
-
-def clear_state_history(state_file: Path, keep_current: bool = True) -> bool:
-    """Clear state history while optionally keeping current wallpapers.
-
-    Args:
-        state_file: Path to state file
-        keep_current: If True, preserve current_wallpapers for restoration
-
-    Returns:
-        True if successful, False otherwise
-
-    """
-    state = load_state(state_file)
-    if state is None:
-        logging.error("No state file found to clear")
-        return False
-
-    # Clear round_robin tracking
-    state["round_robin"] = {}
-
-    # Optionally clear current_wallpapers
-    if not keep_current:
-        state["current_wallpapers"] = {}
-        state["last_run"] = None
-
-    success = save_state(state_file, state)
-    if success:
-        logging.info("Cleared state (keep_current=%s)", keep_current)
-    return success
-
-
-def display_current_state(state: StateDict) -> None:
-    """Display current wallpaper state.
-
-    Args:
-        state: State dictionary
-
-    """
-    last_run = state.get("last_run", "Never")
-    print(f"Last run: {last_run}")
-
-    if state.get("current_wallpapers"):
-        print("\n=== Current Wallpapers ===")
-        for monitor, info in state["current_wallpapers"].items():
-            print(f"  {monitor}: {info.get('filename')}")
-            print(f"    Set at: {info.get('timestamp')}")
-    else:
-        print("\nNo current wallpapers recorded")
-
-    # Display round-robin state
-    if state.get("round_robin"):
-        print("\n=== Round-Robin State ===")
-        for directory, rr_state in state["round_robin"].items():
-            dir_name = Path(directory).name
-            position = rr_state.get("position", 0)
-            total = len(rr_state.get("images", []))
-            print(f"  {dir_name}: position {position}/{total}")
-
-
-def restore_wallpapers(state: StateDict) -> dict[str, Path] | None:
-    """Get current wallpapers for restoration.
-
-    Args:
-        state: State dictionary
-
-    Returns:
-        Dictionary mapping monitor names to wallpaper paths,
-        or None if no current wallpapers or files missing
-
-    """
-    if "current_wallpapers" not in state or not state["current_wallpapers"]:
-        logging.error("No wallpaper history found in state")
-        return None
-
-    # Note: We only have filename in simplified state, not full path
-    # This function would need additional logic to locate files
-    # For now, log a warning
-    logging.warning(
-        "restore_wallpapers requires full path reconstruction - "
-        "not implemented"
-    )
-    return None
 
 
 def cleanup_old_entries(state: StateDict, max_age_days: int = 30) -> None:
